@@ -135,6 +135,20 @@ body { color: var(--navy); }
 .who .tx { display: flex; flex-direction: column; min-width: 0; }
 .who .tx b { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .who .tx span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vsum { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 4px 0 14px 48px; }
+.vcap { display: grid; grid-template-columns: repeat(15, 1fr); gap: 4px; flex: 1 1 260px; max-width: 420px; }
+.vcap .seg { height: 8px; border-radius: 4px; background: var(--lb); }
+.vcap .seg.on { background: var(--blue); }
+.vcap .seg.on.over { background: var(--red, #C0392B); }
+.vmix { display: flex; gap: 6px; flex-wrap: wrap; }
+.vgrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.vcard { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 14px 40px 14px 14px; border-radius: 16px; background: var(--lb-2); box-shadow: inset 0 0 0 1px var(--lb-line); min-width: 0; }
+.vcard .ava { width: 40px; height: 40px; border-radius: 50%; flex: none; background: var(--blue-grad, var(--blue)); color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.vcard .tx { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vcard .tx b { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vcard .tx > span:nth-child(2) { font-size: 13px; color: var(--muted); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vcard .xbtn { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; background: #fff; }
+@media (max-width: 1100px) { .vgrid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 .purpose { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; color: var(--navy); background: var(--lb-2); box-shadow: inset 0 0 0 1px var(--lb-line); border-radius: 10px; padding: 8px 12px; }
 .purpose .ic { display: flex; color: var(--blue); flex: none; }
 .purpose .tx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

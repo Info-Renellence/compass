@@ -12,6 +12,7 @@ const TITLES = ['How last week went', 'Second look', 'Visits this week', 'Quick 
 const MAX_VISITS = 15;
 const GROUP_ORDER = { candidate: 0, onboarded: 1, fifty: 2, lead: 3 };
 const GROUP_LABEL = { candidate: 'Candidate', onboarded: 'Onboarded', fifty: 'My Fifty', lead: 'Lead' };
+const GROUP_KEYS = ['candidate', 'onboarded', 'fifty', 'lead'];
 const AVATAR_TONES = ['background:#FDE7E7;color:#B42318', 'background:#FFF1D6;color:#8A5A00', 'background:#EAF3FC;color:#1170C0', 'background:#E6F4EA;color:#1E7B3C', 'background:#F1E8FB;color:#6B3FA0', 'background:#E8F4F7;color:#1D6F82'];
 const css = (s) => Object.fromEntries(s.split(';').filter(Boolean).map((p) => { const [k, v] = p.split(':'); return [k.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), v]; }));
 
@@ -201,15 +202,27 @@ function Visits({ visits, onRemove }) {
   return (
     <section className="cc">
       <CardHead icon="pin" title="Visits this week" right={<span className={'right-strong' + (over ? ' over' : '')}>{visits.length} of {MAX_VISITS}</span>} />
-      <span className="cc-note">Talk through each visit. Next steps from the meeting notes are added here afterwards.</span>
-      {visits.map((a) => (
-        <div key={a.id} className="vrow">
-          <span className="who"><span className="ava">{a.ini}</span><span className="tx"><b>{a.name}</b><span>{a.fact}</span></span></span>
-          <span className="purpose"><span className="ic"><Icon name="doc" size={14} /></span><span className="tx">{a.purpose || a.suggestedReason}</span></span>
-          <span><span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span></span>
-          <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={14} stroke={2.4} /></button>
+      {/* Owner 2026-10-23: no purpose notes on this step; the space goes to a capacity bar, a mix by group and a card grid. */}
+      <div className="vsum">
+        <div className="vcap" aria-label={visits.length + ' of ' + MAX_VISITS + ' visits'}>
+          {Array.from({ length: MAX_VISITS }, (_, i) => <span key={i} className={'seg' + (i < visits.length ? (over ? ' on over' : ' on') : '')} />)}
         </div>
-      ))}
+        <div className="vmix">
+          {GROUP_KEYS.map((g) => {
+            const n = visits.filter((a) => a.group === g).length;
+            return n ? <span key={g} className={'gpill ' + g}>{n} {GROUP_LABEL[g]}</span> : null;
+          })}
+        </div>
+      </div>
+      <div className="vgrid">
+        {visits.map((a) => (
+          <div key={a.id} className="vcard">
+            <span className="ava">{a.ini}</span>
+            <span className="tx"><b>{a.name}</b><span>{a.fact}</span><span><span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span></span></span>
+            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={12} stroke={2.4} /></button>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
