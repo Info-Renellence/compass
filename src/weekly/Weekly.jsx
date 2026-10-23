@@ -3,14 +3,15 @@
 // meeting notes afterwards. No "AI" wording, no "flagged", no counts of changed suggestions.
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { data } from '../data/index.js';
+import { data, words } from '../data/index.js';
 import { GOALS, goalByKey, SKILLS, CHARACTERS, skillByKey, PICKS } from '../data/catalog.js';
 import { Icon } from '../icons.jsx';
 import { Banner, CardHead, Foot, Done, useToast } from '../ui.jsx';
 
 const STEPS = ['Last week', 'Second look', 'Visits', 'Roleplay', 'Calls', 'Focus'];
 const TITLES = ['How last week went', 'Second look', 'Visits this week', 'Quick roleplay', 'Calls this week', 'One focus'];
-const MAX_VISITS = 15;
+// The weekly visit cap: settings.compass.max_visits from the API (session.maxVisits); 15 on sample data.
+let MAX_VISITS = 15;
 const GROUP_ORDER = { candidate: 0, onboarded: 1, fifty: 2, lead: 3 };
 const GROUP_LABEL = { candidate: 'Candidate', onboarded: 'Onboarded', fifty: 'My Fifty', lead: 'Lead' };
 const GROUP_KEYS = ['candidate', 'onboarded', 'fifty', 'lead'];
@@ -19,11 +20,24 @@ const css = (s) => Object.fromEntries(s.split(';').filter(Boolean).map((p) => { 
 
 function fresh(d) {
   const month = skillByKey(d.roleplay.monthSkill) || SKILLS[0];
+  const sv = d.saved || {};
+  // A week already saved opens as it was agreed: the second-look decisions and the final picks.
+  const decision = {}, removed = {}, toVisit = {}, toCall = {};
+  for (const x of d.secondLook) if (x.decision) decision[x.id] = x.decision;
+  for (const a of d.accounts) {
+    if (!a.finalPick) continue;
+    const planned = decision[a.id] === 'change' ? a.suggestedPick : a.repPick;
+    if (a.finalPick === planned) continue;
+    if (a.finalPick === 'visit') toVisit[a.id] = true;
+    else if (a.finalPick === 'call') toCall[a.id] = true;
+    else if (planned === 'visit' || planned === 'call') removed[a.id] = true;
+  }
+  const skill = skillByKey(sv.skill) || month;
   return {
     step: 1, reached: 1, done: false,
-    decision: {}, removed: {}, toVisit: {}, toCall: {},
-    goal: null, target: 3,
-    skill: month.key, character: month.character || 'skeptic', practiced: false, curve: false, swapped: false,
+    decision, removed, toVisit, toCall,
+    goal: sv.goal || null, target: sv.target || 3,
+    skill: skill.key, character: sv.character || skill.character || 'skeptic', practiced: !!sv.practiced, curve: false, swapped: false,
     commit: Object.fromEntries(d.commitments.map((c) => [c.key, !!c.on])),
   };
 }
@@ -32,6 +46,7 @@ export default function Weekly({ repId }) {
   const [d, setD] = useState(null);
   useEffect(() => { data.weekly(repId).then(setD); }, [repId]);
   if (!d) return <div className="loading">Loading…</div>;
+  MAX_VISITS = (d.session && d.session.maxVisits) || 15;
   return <Session d={d} repId={repId} />;
 }
 
@@ -57,15 +72,16 @@ function Session({ d, repId }) {
 
   const goStep = (k) => set((x) => ({ step: k, reached: Math.max(x.reached, k) }));
   const next = () => {
-    if (!okStep[s.step - 1]) { flash(s.step === 3 ? 'Cut visits to 15 or fewer' : 'Pick a focus first'); return; }
+    if (!okStep[s.step - 1]) { flash(s.step === 3 ? 'Cut visits to ' + MAX_VISITS + ' or fewer' : 'Pick a focus first'); return; }
     if (s.step < 6) { goStep(s.step + 1); return; }
     const plan = {
       picks: d.accounts.map((a) => ({ id: a.id, finalPick: s.removed[a.id] ? 'wait' : finalPick(a) })),
       secondLook: d.secondLook.map((x) => ({ id: x.id, decision: s.decision[x.id] || null })),
       focus: { goal: goal.key, actionTarget: s.target },
       roleplay: { skill: s.skill, character: s.character, done: s.practiced },
+      commitments: d.commitments.filter((c) => s.commit[c.key]).map((c) => c.text),
     };
-    data.saveWeekly(repId, plan).then(() => { set({ done: true }); flash('Sent to ' + rep + '’s Pulse'); });
+    data.saveWeekly(repId, plan).then(() => { set({ done: true }); flash('Sent to ' + rep + '’s Pulse'); }, (e) => flash(words(e)));
   };
   const back = () => set((x) => ({ step: Math.max(1, x.step - 1) }));
 
@@ -83,7 +99,11 @@ function Session({ d, repId }) {
               const on = !!s.commit[c.key];
               return (
                 <button key={c.key} type="button" className={'wchip' + (on ? ' on' : '')} aria-pressed={on}
-                  onClick={() => set((x) => ({ commit: Object.assign({}, x.commit, { [c.key]: !x.commit[c.key] }) }))}>
+                  onClick={() => {
+                    const commit = Object.assign({}, s.commit, { [c.key]: !s.commit[c.key] });
+                    set({ commit });
+                    data.saveCommitments(repId, d.commitments.filter((k) => commit[k.key]).map((k) => k.text)).catch((e) => flash(words(e)));
+                  }}>
                   {on ? <Icon name="check" size={13} stroke={3} /> : null}{c.text}
                 </button>
               );
@@ -117,7 +137,7 @@ function Session({ d, repId }) {
       {s.step === 5 ? <Calls calls={calls}
         onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }}
         onVisit={(a) => {
-          if (visits.length >= MAX_VISITS) { flash('Visits are full: 15 a week'); return; }
+          if (visits.length >= MAX_VISITS) { flash('Visits are full: ' + MAX_VISITS + ' a week'); return; }
           set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }), toCall: Object.assign({}, x.toCall, { [a.id]: false }) })); flash(a.name + ' moved to visits');
         }} /> : null}
       {s.step === 6 ? <Focus s={s} set={set} rep={rep} /> : null}
@@ -127,16 +147,17 @@ function Session({ d, repId }) {
 }
 
 function LastWeek({ d, rep }) {
-  const f = d.lastFocus, g = goalByKey(f.goal), t = d.tiles;
+  const f = d.lastFocus, g = f && goalByKey(f.goal), t = d.tiles;
+  const of = (x) => (x.planned == null ? String(x.done) : x.done + ' of ' + x.planned);
   return (
     <>
-      <section className="talk">
+      {d.checkin.helpNote ? <section className="talk">
         <span className="ic"><Icon name="chat" size={20} /></span>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <span className="k">{rep.toUpperCase()} WANTS TO TALK ABOUT</span>
           <span className="q">“{d.checkin.helpNote}”</span>
         </span>
-      </section>
+      </section> : null}
       <div className="wins">
         {d.wins.map((w) => (
           <span key={w.title} className="win">
@@ -146,32 +167,40 @@ function LastWeek({ d, rep }) {
         ))}
       </div>
       <div className="lw-grid">
-        <section className="focus-hero">
-          <span className="top"><span className="k">LAST WEEK’S FOCUS</span><span className="when">{f.setLabel} · counted from Pulse and orders</span></span>
-          <span className="g">{g.name}</span>
-          <div className="subs">
-            <span className="sub"><span className="a">WEEKLY ACTION</span><span className="b">{f.actionDone} of {f.actionTarget}</span><span className="c">{g.action}</span></span>
-            <span className="sub"><span className="a">RESULT</span><span className="b">{f.result}</span><span className="c">{g.result}{f.resultNote ? ' · ' + f.resultNote : ''}</span></span>
-          </div>
-        </section>
+        {g ? (
+          <section className="focus-hero">
+            <span className="top"><span className="k">LAST WEEK’S FOCUS</span><span className="when">{f.setLabel} · counted from Pulse and orders</span></span>
+            <span className="g">{g.name}</span>
+            <div className="subs">
+              <span className="sub"><span className="a">WEEKLY ACTION</span><span className="b">{f.actionTarget ? f.actionDone + ' of ' + f.actionTarget : f.actionDone}</span><span className="c">{g.action}</span></span>
+              <span className="sub"><span className="a">RESULT</span><span className="b">{f.result}</span><span className="c">{g.result}{f.resultNote ? ' · ' + f.resultNote : ''}</span></span>
+            </div>
+          </section>
+        ) : (
+          <section className="focus-hero">
+            <span className="top"><span className="k">LAST WEEK’S FOCUS</span></span>
+            <span className="g">No focus was set last week</span>
+          </section>
+        )}
         <div className="lw-col">
           <section className="stat white"><span className="k">MY FIFTY</span><span className="v">{t.fifty.count}</span><span className="s">{t.fifty.note}</span></section>
           <section className="stat soft"><span className="k">FORECAST LANDED</span><span className="v">{t.forecastLanded.landed} of {t.forecastLanded.due}</span><span className="s">Due last week</span></section>
         </div>
         <div className="lw-col">
-          <section className="stat soft"><span className="k">VISITS DONE</span><span className="v">{t.visits.done} of {t.visits.planned}</span><span className="s">Planned last Monday</span></section>
-          <section className="stat white"><span className="k">CALLS DONE</span><span className="v">{t.calls.done} of {t.calls.planned}</span><span className="s">Planned last Monday</span></section>
+          <section className="stat soft"><span className="k">VISITS DONE</span><span className="v">{of(t.visits)}</span><span className="s">{t.visits.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
+          <section className="stat white"><span className="k">CALLS DONE</span><span className="v">{of(t.calls)}</span><span className="s">{t.calls.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
         </div>
       </div>
       <div className="two">
         <section className="cc">
           <CardHead icon="pin" title="Missed visits" right={<span className="cnt">{d.missedVisits.length}</span>} />
-          {d.missedVisits.map((m) => <div key={m.name} className="mrow"><span className="n">{m.name}</span></div>)}
+          {d.missedVisits.length ? d.missedVisits.map((m, i) => <div key={m.name + i} className="mrow"><span className="n">{m.name}</span></div>)
+            : <span className="cc-note">None</span>}
         </section>
         <section className="cc">
           <CardHead icon="doc" title="Forecast changes" right={<span className="cnt green"><Icon name="check" size={13} stroke={2.6} />{d.checkin.submittedLabel}</span>} />
           <div className="fc-lines">
-            {d.forecastChanges.map((c) => <span key={c.who}><b>{c.who}</b> {c.what} · {c.reason}</span>)}
+            {d.forecastChanges.length ? d.forecastChanges.map((c, i) => <span key={c.who + i}><b>{c.who}</b> {c.what} · {c.reason}</span>) : <span>No forecast changes</span>}
           </div>
         </section>
       </div>
@@ -182,6 +211,7 @@ function LastWeek({ d, rep }) {
 function SecondLook({ d, byId, rep, decision, onDecide }) {
   return (
     <div className="sl-list">
+      {!d.secondLook.length ? <section className="cc"><span className="cc-note">Nothing for a second look this week.</span></section> : null}
       {d.secondLook.map((x) => {
         const a = byId[x.id], dec = decision[x.id];
         return (

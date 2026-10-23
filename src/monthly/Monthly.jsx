@@ -2,7 +2,7 @@
 // 60-minute session. Last month against target -> next month's target and forecast -> a status for every My Fifty
 // account -> growth and feedback -> done. Start from the target, build the forecast, close the gap together.
 import { useEffect, useState } from 'react';
-import { data } from '../data/index.js';
+import { data, words } from '../data/index.js';
 import { goalByKey, SKILLS, skillByKey, FIFTY_STATUS } from '../data/catalog.js';
 import { Icon } from '../icons.jsx';
 import { Banner, CardHead, Foot, Done, money, useToast } from '../ui.jsx';
@@ -32,12 +32,12 @@ function Session({ d, repId }) {
   const next = () => {
     if (s.step < 4) { set({ step: s.step + 1 }); return; }
     const plan = { addedForecasts: nm.gap.filter((g) => s.added[g.id]).map((g) => g.id), fiftyStatus: d.fifty.map((f) => ({ id: f.id, status: s.status[f.id] })), skill: s.skill };
-    data.saveMonthly(repId, plan).then(() => { set({ done: true }); flash(m.nextMonth + ' saved'); });
+    data.saveMonthly(repId, plan).then(() => { set({ done: true }); flash(m.nextMonth + ' saved'); }, (e) => flash(words(e)));
   };
 
   if (s.done) {
     return (
-      <Done wide title={m.nextMonth + ' is set'} line={'Target ' + money(nm.target) + ' · ' + rep + ' forecasts ' + money(total) + ' · skill: ' + skill.name}>
+      <Done wide title={m.nextMonth + ' is set'} line={(nm.target ? 'Target ' + money(nm.target) : 'No target set') + ' · ' + rep + ' forecasts ' + money(total) + ' · skill: ' + skill.name}>
         <div className="where c3">
           <section><span className="k">EDGE · FORECAST</span><span className="t">New {m.nextMonth} forecasts added</span></section>
           <section><span className="k">EDGE · CUSTOMERS</span><span className="t">My Fifty statuses saved</span></section>
@@ -67,20 +67,21 @@ function Session({ d, repId }) {
 
 function LastMonth({ d, rep }) {
   const l = d.lastMonth, m = d.session;
-  const pct = Math.round(l.ordered / l.target * 100);
-  const short = l.target - l.ordered;
-  const max = Math.max(...l.slipped.map((x) => x[1]));
+  const pct = l.target ? Math.round(l.ordered / l.target * 100) : null;
+  const short = (l.target || 0) - l.ordered;
+  const max = Math.max(1, ...l.slipped.map((x) => x[1]));
   const hits = l.focusWeeks.filter((w) => w.done >= w.target).length;
   return (
     <>
       <div className="lw-grid">
         <section className="target-hero">
           <span className="k">{m.lastMonth.toUpperCase()} TARGET</span>
-          <span className="pct">{pct}%<small> · {money(l.ordered)} of {money(l.target)}</small></span>
-          <span className="bar"><span style={{ width: Math.min(100, pct) + '%' }} /></span>
-          <span className="s">{short > 0 ? money(short) + ' short' : money(-short) + ' over'} · {m.prevMonth} was {l.prevPercent}%</span>
+          {pct == null ? <span className="pct">{money(l.ordered)}<small> ordered · no target set</small></span>
+            : <span className="pct">{pct}%<small> · {money(l.ordered)} of {money(l.target)}</small></span>}
+          <span className="bar"><span style={{ width: Math.min(100, pct || 0) + '%' }} /></span>
+          <span className="s">{pct == null ? '' : (short > 0 ? money(short) + ' short' : money(-short) + ' over')}{l.prevPercent != null ? ' · ' + m.prevMonth + ' was ' + l.prevPercent + '%' : ''}</span>
         </section>
-        <section className="stat white"><span className="k">FORECAST ACCURACY</span><span className="v lg">{l.forecastAccuracy}%</span><span className="s">Of what {rep} forecast on {l.accuracyNote}, this much ordered</span></section>
+        <section className="stat white"><span className="k">FORECAST ACCURACY</span><span className="v lg">{l.forecastAccuracy == null ? '—' : l.forecastAccuracy + '%'}</span><span className="s">{l.forecastAccuracy == null ? 'No forecast snapshot on ' + l.accuracyNote : 'Of what ' + rep + ' forecast on ' + l.accuracyNote + ', this much ordered'}</span></section>
         <section className="stat soft"><span className="k">MY FIFTY</span><span className="v lg">{l.fifty.count}</span><span className="s">{l.fifty.note}</span></section>
       </div>
       <div className="two">
@@ -89,10 +90,12 @@ function LastMonth({ d, rep }) {
           {l.slipped.map(([why, n]) => (
             <div key={why} className="slip"><span className="n">{why}</span><span className="hbar"><span style={{ width: (n / max * 100) + '%' }} /></span><span className="c">{n}</span></div>
           ))}
-          <span className="pattern"><b>Pattern:</b> {l.pattern}</span>
+          {!l.slipped.length ? <span className="cc-note">No forecast changes from Friday check-ins</span> : null}
+          {l.pattern ? <span className="pattern"><b>Pattern:</b> {l.pattern}</span> : null}
         </section>
         <section className="cc">
           <CardHead icon="star5" title="Weekly focus this month" right={<span className="right-note">Action hit {hits} of {l.focusWeeks.length} weeks</span>} />
+          {!l.focusWeeks.length ? <span className="cc-note">No weekly focus was set</span> : null}
           {l.focusWeeks.map((w) => (
             <div key={w.week} className="wk"><span className="d">{w.week}</span><span className="g">{goalByKey(w.goal).name}</span>
               <span className={'hit' + (w.done >= w.target ? ' yes' : '')}>{w.done} of {w.target}</span></div>
@@ -105,16 +108,18 @@ function LastMonth({ d, rep }) {
 
 function NextMonth({ d, rep, base, total, added, onToggle }) {
   const nm = d.nextMonth, m = d.session;
-  const gap = nm.target - total;
+  const tgt = nm.target || 0;
+  const gap = tgt - total;
+  const pctOf = (v) => (tgt ? Math.round(v / tgt * 100) : 0);
   return (
     <>
       <section className="sum">
         <div className="nums">
-          <span><span className="k">{m.nextMonth.toUpperCase()} TARGET</span><span className="v">{money(nm.target)}</span><span className="s">Set by Renellence</span></span>
-          <span><span className="k blue">{rep.toUpperCase()}’S FORECAST</span><span className="v blue">{money(total)}</span><span className="s">{Math.round(total / nm.target * 100)}% of target</span></span>
+          <span><span className="k">{m.nextMonth.toUpperCase()} TARGET</span><span className="v">{nm.target ? money(nm.target) : '—'}</span><span className="s">{nm.target ? 'Set by Renellence' : 'No target set yet'}</span></span>
+          <span><span className="k blue">{rep.toUpperCase()}’S FORECAST</span><span className="v blue">{money(total)}</span><span className="s">{tgt ? pctOf(total) + '% of target' : ''}</span></span>
           <span className="gap"><span className="k">GAP</span><span className={'v' + (gap > 0 ? '' : ' green')}>{gap > 0 ? money(gap) : 'Covered'}</span><span className="s">{gap > 0 ? 'still to find' : money(-gap) + ' over target'}</span></span>
         </div>
-        <span className="gbar" role="img" aria-label={Math.round(total / nm.target * 100) + '% of target'}><span style={{ width: Math.min(100, total / nm.target * 100).toFixed(1) + '%' }} /></span>
+        <span className="gbar" role="img" aria-label={pctOf(total) + '% of target'}><span style={{ width: (tgt ? Math.min(100, total / tgt * 100) : 0).toFixed(1) + '%' }} /></span>
       </section>
       <div className="nm-grid">
         <section className="cc">

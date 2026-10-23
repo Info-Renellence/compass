@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "shots": "node scripts/shots.mjs"
+    "shots": "node scripts/shots.mjs",
+    "test:db": "node --require ./test/run/no-network.js test/run/db-compass.test.js",
+    "serve:test": "node --require ./test/run/no-network.js test/run/serve.js"
   },
   "dependencies": {
     "google-auth-library": "^9.15.1",

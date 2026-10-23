@@ -164,5 +164,6 @@ export const sample = {
   weekly: (repId) => wait(weekly(repOf(repId))),
   monthly: (repId) => wait(monthly(repOf(repId))),
   saveWeekly: (repId, plan) => { console.info('[sample] weekly 1-on-1 not saved (sample data)', repId, plan); return wait({ ok: true, sample: true }); },
+  saveCommitments: (repId, list) => { console.info('[sample] commitments not saved (sample data)', repId, list); return wait({ ok: true, sample: true }); },
   saveMonthly: (repId, plan) => { console.info('[sample] monthly 1-on-1 not saved (sample data)', repId, plan); return wait({ ok: true, sample: true }); },
 };
