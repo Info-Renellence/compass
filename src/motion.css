@@ -1,0 +1,74 @@
+/* Compass motion (UI polish batch 2, owner approved 2026-10-23). Everything here can be removed on its own.
+   Rules: --motion-fast 150ms micro feedback, --motion-standard 250ms enter/exit, --motion-celebrate 600ms only for the
+   weekly focus hit. Ease-out to enter, ease-in to exit, ease-in-out to move. Transform and opacity for anything that
+   moves; colour fades only for hover/press/selected states. CSS only, nothing blocks input or delays data, no page
+   transitions, no reorder animations. Reduced motion: everything shows its end state. */
+
+/* ---------- Micro feedback: hover, press, select (150ms) ---------- */
+.btn, .chip, .slbtn, .sbtn, .rchip, .wchip, .minibtn, .addb, .sopt, .xbtn, .circ, .cx-tab, .cx-who > button, .cx-menu button,
+.stepper button, .stepper button .n, .mskill, .goal, .sl, .vcard, .callc, .grow-row {
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-out);
+}
+.btn:active, .chip:active, .slbtn:active, .sbtn:active, .rchip:active, .wchip:active, .minibtn:active, .addb:active,
+.sopt:active, .xbtn:active, .circ:active, .cx-tab:active, .mskill:active, .goal:active { transform: scale(.98); }
+.btn.next.blocked:active { transform: none; }
+
+/* A number that changed: the live count, the focus target, the forecast and gap. */
+.bump { animation: bump var(--motion-fast) var(--ease-out); }
+@keyframes bump { from { transform: scale(.96); opacity: .6; } to { transform: none; opacity: 1; } }
+
+/* ---------- Enter / exit (250ms in, 150ms out) ---------- */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes fade-up { from { opacity: .4; } to { opacity: 1; } }
+
+/* Toast: rises 8px in, fades out. */
+.cx-toast { animation: toast-in var(--motion-standard) var(--ease-out); }
+.cx-toast.leaving { animation: toast-out var(--motion-fast) var(--ease-in) forwards; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toast-out { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 8px); } }
+
+/* Rep menu: drops in from the trigger, fades out. */
+.cx-menu, .cx-menu:not(.open) { display: block; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(-8px) scale(.96); transform-origin: top right;
+  transition: opacity var(--motion-fast) var(--ease-in), transform var(--motion-fast) var(--ease-in), visibility 0s linear var(--motion-fast); }
+.cx-menu.open { visibility: visible; opacity: 1; pointer-events: auto; transform: none;
+  transition: opacity var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-out), visibility 0s; }
+
+/* A visit or call removed or moved: the card fades and shrinks before it goes (exit only, the rest don't animate). */
+.vcard.leaving, .callc.leaving { animation: card-out var(--motion-fast) var(--ease-in) forwards; pointer-events: none; }
+@keyframes card-out { to { opacity: 0; transform: scale(.96); } }
+
+/* Capacity bar: a filled segment fades up; over the cap, the red segments fade once (no shake). */
+.vcap .seg.on { animation: fade-up var(--motion-fast) var(--ease-out); }
+.vcap .seg.on.over { animation: seg-over var(--motion-standard) var(--ease-out); }
+@keyframes seg-over { from { opacity: .4; } to { opacity: 1; } }
+
+/* Roleplay curveball, the focus panel and its tick. */
+.curve { animation: rise var(--motion-standard) var(--ease-out); }
+.lead-lag { animation: rise var(--motion-standard) var(--ease-out); }
+.tick { animation: pop var(--motion-fast) var(--ease-out); }
+
+/* Monthly: the forecast bar moves, "Covered" fades in. */
+.gbar span { transition: transform var(--motion-standard) var(--ease-in-out); }
+.sum .v.covered-in { animation: fade-up var(--motion-standard) var(--ease-out); }
+
+/* Done: the check settles with one soft ring, the "where" cards fade up in turn. Calm, not a celebration. */
+.done-page .halo { isolation: isolate; animation: pop var(--motion-celebrate) var(--ease-out); }
+.done-page .halo::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--tint); opacity: 0; pointer-events: none;
+  animation: halo-ring var(--motion-celebrate) var(--ease-out); z-index: -1; }
+@keyframes halo-ring { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.35); } }
+.where section { animation: rise var(--motion-standard) var(--ease-out) both; }
+.where section:nth-child(2) { animation-delay: 60ms; }
+.where section:nth-child(3) { animation-delay: 120ms; }
+
+/* Skeleton: a slow pulse while loading. */
+.skel, .skel-tile { animation: skel-pulse 1.3s var(--ease-in-out) infinite; }
+@keyframes skel-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* ---------- Reduced motion: show the end state ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; transition-delay: 0s !important; }
+  .btn:active, .chip:active, .slbtn:active, .sbtn:active, .rchip:active, .wchip:active, .minibtn:active, .addb:active,
+  .sopt:active, .xbtn:active, .circ:active, .cx-tab:active, .mskill:active, .goal:active { transform: none; }
+}

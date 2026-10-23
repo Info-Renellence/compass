@@ -17,6 +17,17 @@ const GROUP_KEYS = ['candidate', 'onboarded', 'fifty', 'lead'];
 const cap = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 // A Friday check-in counts as sent when the API labels it "Sent ..." (else "Draft, not sent" / "No Friday check-in").
 const isSent = (label) => /^Sent\b/.test(label || '');
+// A card that leaves a list (removed, or moved to the other list) plays a 150ms exit first, unless motion is reduced.
+const reduced = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+function useLeaving() {
+  const [gone, setGone] = useState({});
+  const leave = (a, fn) => {
+    if (reduced()) { fn(a); return; }
+    setGone((g) => Object.assign({}, g, { [a.id]: true }));
+    setTimeout(() => { fn(a); setGone((g) => Object.assign({}, g, { [a.id]: false })); }, 150);
+  };
+  return [gone, leave];
+}
 
 function fresh(d) {
   const month = skillByKey(d.roleplay.monthSkill) || SKILLS[0];
@@ -142,7 +153,7 @@ function Session({ d, repId }) {
           flash(a.name + ' moved to calls');
         }} /> : null}
       {s.step === 4 ? <Roleplay s={s} set={set} rep={rep} boss={boss} d={d} flash={flash} /> : null}
-      {s.step === 5 ? <Calls calls={calls}
+      {s.step === 5 ? <Calls calls={calls} full={visits.length >= MAX_VISITS}
         onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }}
         onVisit={(a) => {
           if (visits.length >= MAX_VISITS) { flash('Visits are full: ' + MAX_VISITS + ' a week', 'warn'); return; }
@@ -267,6 +278,7 @@ function LiveCount({ visits, calls }) {
 
 function Visits({ visits, onRemove, onCall }) {
   const over = visits.length > MAX_VISITS;
+  const [gone, leave] = useLeaving();
   return (
     <section className="cc">
       <CardHead lite icon="pin" title="Visits this week" right={<span className={'right-strong' + (over ? ' over' : '')}>{over ? <Icon name="alert" size={14} /> : null}{visits.length} of {MAX_VISITS}</span>} />
@@ -284,12 +296,12 @@ function Visits({ visits, onRemove, onCall }) {
       </div>
       <div className="vgrid">
         {visits.map((a) => (
-          <div key={a.id} className="vcard">
+          <div key={a.id} className={'vcard' + (gone[a.id] ? ' leaving' : '')}>
             <span className="ava">{a.ini}</span>
             <span className="tx"><b>{a.name}</b><span>{a.fact}</span>
               <span className="vfoot"><span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span>
-                <button type="button" className="minibtn tocall" onClick={() => onCall(a)}><Icon name="call" size={14} />Make it a call</button></span></span>
-            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={14} /></button>
+                <button type="button" className="minibtn tocall" onClick={() => leave(a, onCall)}><Icon name="call" size={14} />Make it a call</button></span></span>
+            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => leave(a, onRemove)}><Icon name="x" size={14} /></button>
           </div>
         ))}
       </div>
@@ -354,18 +366,19 @@ function Roleplay({ s, set, rep, boss, d, flash }) {
   );
 }
 
-function Calls({ calls, onRemove, onVisit }) {
+function Calls({ calls, full, onRemove, onVisit }) {
+  const [gone, leave] = useLeaving();
   return (
     <section className="cc">
       <CardHead lite icon="call" title="Calls this week" right={<span className="right-strong">{calls.length} calls</span>} />
       <span className="cc-note">A quick look. Turn any call into a visit if it deserves one.</span>
       <div className="calls">
         {calls.map((a) => (
-          <div key={a.id} className="callc">
+          <div key={a.id} className={'callc' + (gone[a.id] ? ' leaving' : '')}>
             <span className="ava">{a.ini}</span>
             <span className="tx"><b>{a.name}</b><span>{a.purpose || a.suggestedReason}</span></span>
-            <button type="button" className="minibtn tovisit" onClick={() => onVisit(a)}><Icon name="pin" size={14} />Make it a visit</button>
-            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={14} /></button>
+            <button type="button" className="minibtn tovisit" onClick={() => (full ? onVisit(a) : leave(a, onVisit))}><Icon name="pin" size={14} />Make it a visit</button>
+            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => leave(a, onRemove)}><Icon name="x" size={14} /></button>
           </div>
         ))}
       </div>
@@ -394,7 +407,7 @@ function Focus({ s, set, rep }) {
             <span className="k">WEEKLY ACTION · WHAT {rep.toUpperCase()} CONTROLS</span>
             <span className="stepr">
               <button type="button" className="circ" aria-label="Less" onClick={() => set((x) => ({ target: Math.max(1, x.target - 1) }))}><Icon name="minus" size={16} /></button>
-              <span className="num" aria-live="polite">{s.target}</span>
+              <span key={s.target} className="num bump" aria-live="polite">{s.target}</span>
               <button type="button" className="circ plus" aria-label="More" onClick={() => set((x) => ({ target: Math.min(15, x.target + 1) }))}><Icon name="plus" size={16} /></button>
               <span className="act">{g.action}</span>
             </span>

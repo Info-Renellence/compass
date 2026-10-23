@@ -66,19 +66,18 @@ export default function App() {
               <button type="button" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
                 <span className="ava">{rep.ini}</span>{rep.first}<Icon name="chevronDown" size={14} className="chev" />
               </button>
-              {menu ? (
-                <div className="cx-menu" role="menu">
-                  <div className="lbl">1-ON-1 WITH</div>
-                  {sess.reps.map((r) => (
-                    <button key={r.id} type="button" role="menuitemradio" aria-checked={r.id === repId} className={r.id === repId ? 'on' : ''}
-                      onClick={() => { setRepId(r.id); setMenu(false); }}>
-                      <span className="ava">{r.ini}</span>{r.first} {r.last}
-                    </button>
-                  ))}
-                  {!isSample ? <button type="button" role="menuitem" onClick={() => { data.signOut(); if (window.google && window.google.accounts) window.google.accounts.id.disableAutoSelect(); window.location.href = '/'; }}>Sign out</button> : null}
-                  {isSample ? <div className="lbl sample-row"><span className="cx-sample">Sample data · nothing is saved</span></div> : null}
-                </div>
-              ) : null}
+              {/* Always mounted so it can fade out; hidden (and out of the tab order) while closed. */}
+              <div className={'cx-menu' + (menu ? ' open' : '')} role="menu" aria-hidden={!menu || undefined}>
+                <div className="lbl">1-ON-1 WITH</div>
+                {sess.reps.map((r) => (
+                  <button key={r.id} type="button" role="menuitemradio" aria-checked={r.id === repId} className={r.id === repId ? 'on' : ''}
+                    onClick={() => { setRepId(r.id); setMenu(false); }}>
+                    <span className="ava">{r.ini}</span>{r.first} {r.last}
+                  </button>
+                ))}
+                {!isSample ? <button type="button" role="menuitem" onClick={() => { data.signOut(); if (window.google && window.google.accounts) window.google.accounts.id.disableAutoSelect(); window.location.href = '/'; }}>Sign out</button> : null}
+                {isSample ? <div className="lbl sample-row"><span className="cx-sample">Sample data · nothing is saved</span></div> : null}
+              </div>
             </div>
           ) : <span className="cx-who-skel" aria-hidden="true"><span className="skel c" /><span className="skel b" /></span>}
         </header>

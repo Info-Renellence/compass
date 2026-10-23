@@ -123,8 +123,8 @@ function NextMonth({ d, rep, base, total, added, onToggle }) {
       <section className="sum">
         <div className="nums">
           <span><span className="k">{m.nextMonth.toUpperCase()} TARGET</span><span className="v">{nm.target ? money(nm.target) : '—'}</span><span className="s">{nm.target ? 'Set by Renellence' : 'No target set yet'}</span></span>
-          <span><span className="k blue">{rep.toUpperCase()}’S FORECAST</span><span className="v blue">{money(total)}</span><span className="s">{tgt ? pctOf(total) + '% of target' : ''}</span></span>
-          <span className="gap"><span className="k">GAP</span><span className={'v' + (gap > 0 ? '' : ' green')}>{gap > 0 ? money(gap) : 'Covered'}</span><span className="s">{gap > 0 ? 'still to find' : money(-gap) + ' over target'}</span></span>
+          <span><span className="k blue">{rep.toUpperCase()}’S FORECAST</span><span key={total} className="v blue bump">{money(total)}</span><span className="s">{tgt ? pctOf(total) + '% of target' : ''}</span></span>
+          <span className="gap"><span className="k">GAP</span><span key={gap > 0 ? gap : 'covered'} className={'v' + (gap > 0 ? ' bump' : ' green covered-in')}>{gap > 0 ? money(gap) : 'Covered'}</span><span className="s">{gap > 0 ? 'still to find' : money(-gap) + ' over target'}</span></span>
         </div>
         <span className="gbar" role="img" aria-label={pctOf(total) + '% of target'}><span style={{ transform: 'scaleX(' + (tgt ? Math.min(1, total / tgt) : 0).toFixed(3) + ')' }} /></span>
       </section>

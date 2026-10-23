@@ -120,19 +120,25 @@ export const titleCase = (s) => String(s || '').toLowerCase().replace(/\b[a-z]/g
 const ToastCtx = createContext(() => {});
 export const useToast = () => useContext(ToastCtx);
 export function ToastHost({ children }) {
-  const [toast, setToast] = useState({ msg: '', tone: 'ok' });
+  const [toast, setToast] = useState({ msg: '', tone: 'ok', id: 0, leaving: false });
   const t = useRef(null);
+  // Each message gets its own id (so a new one replays the enter motion); after 2.6 s it plays its 150ms exit, then goes.
   const flash = useCallback((m, tone = 'ok') => {
-    setToast({ msg: m, tone });
+    setToast((x) => ({ msg: m, tone, id: x.id + 1, leaving: false }));
     clearTimeout(t.current);
-    if (m) t.current = setTimeout(() => setToast((x) => ({ msg: '', tone: x.tone })), 2600);
+    if (m) {
+      t.current = setTimeout(() => {
+        setToast((x) => Object.assign({}, x, { leaving: true }));
+        t.current = setTimeout(() => setToast((x) => Object.assign({}, x, { msg: '', leaving: false })), 150);
+      }, 2600);
+    }
   }, []);
-  const { msg, tone } = toast;
+  const { msg, tone, id, leaving } = toast;
   return (
     <ToastCtx.Provider value={flash}>
       {children}
       {msg ? (
-        <div className={'cx-toast ' + tone} role={tone === 'ok' ? 'status' : 'alert'}>
+        <div key={id} className={'cx-toast ' + tone + (leaving ? ' leaving' : '')} role={tone === 'ok' ? 'status' : 'alert'}>
           <span className="tic"><Icon name={tone === 'ok' ? 'check' : 'alert'} size={14} /></span>{msg}
         </div>
       ) : null}
