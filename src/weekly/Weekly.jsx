@@ -2,11 +2,10 @@
 // roleplay -> calls -> one focus -> done. No typing during the meeting: purposes and next steps come from the
 // meeting notes afterwards. No "AI" wording, no "flagged", no counts of changed suggestions.
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { data, words } from '../data/index.js';
 import { GOALS, goalByKey, SKILLS, CHARACTERS, skillByKey, PICKS } from '../data/catalog.js';
 import { Icon } from '../icons.jsx';
-import { Banner, CardHead, Foot, Done, useToast } from '../ui.jsx';
+import { Banner, CardHead, Foot, Done, Empty, ErrorCard, SessionLine, Skeleton, titleCase, useToast } from '../ui.jsx';
 
 const STEPS = ['Last week', 'Second look', 'Visits', 'Roleplay', 'Calls', 'Focus'];
 const TITLES = ['How last week went', 'Second look', 'Visits this week', 'Quick roleplay', 'Calls this week', 'One focus'];
@@ -15,8 +14,9 @@ let MAX_VISITS = 15;
 const GROUP_ORDER = { candidate: 0, onboarded: 1, fifty: 2, lead: 3 };
 const GROUP_LABEL = { candidate: 'Candidate', onboarded: 'Onboarded', fifty: 'My Fifty', lead: 'Lead' };
 const GROUP_KEYS = ['candidate', 'onboarded', 'fifty', 'lead'];
-const AVATAR_TONES = ['background:#FDE7E7;color:#B42318', 'background:#FFF1D6;color:#8A5A00', 'background:#EAF3FC;color:#1170C0', 'background:#E6F4EA;color:#1E7B3C', 'background:#F1E8FB;color:#6B3FA0', 'background:#E8F4F7;color:#1D6F82'];
-const css = (s) => Object.fromEntries(s.split(';').filter(Boolean).map((p) => { const [k, v] = p.split(':'); return [k.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), v]; }));
+const cap = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+// A Friday check-in counts as sent when the API labels it "Sent ..." (else "Draft, not sent" / "No Friday check-in").
+const isSent = (label) => /^Sent\b/.test(label || '');
 
 function fresh(d) {
   const month = skillByKey(d.roleplay.monthSkill) || SKILLS[0];
@@ -44,8 +44,11 @@ function fresh(d) {
 
 export default function Weekly({ repId }) {
   const [d, setD] = useState(null);
-  useEffect(() => { data.weekly(repId).then(setD); }, [repId]);
-  if (!d) return <div className="loading">Loading…</div>;
+  const [err, setErr] = useState('');
+  const load = () => { setErr(''); data.weekly(repId).then(setD, (e) => setErr(words(e))); };
+  useEffect(load, [repId]);
+  if (err) return <ErrorCard text={err} onRetry={load} />;
+  if (!d) return <Skeleton />;
   MAX_VISITS = (d.session && d.session.maxVisits) || 15;
   return <Session d={d} repId={repId} />;
 }
@@ -56,6 +59,7 @@ function Session({ d, repId }) {
   const set = (patch) => setS((x) => Object.assign({}, x, typeof patch === 'function' ? patch(x) : patch));
   const rep = d.rep.first, boss = d.manager.first;
   const byId = useMemo(() => Object.fromEntries(d.accounts.map((a) => [a.id, a])), [d]);
+  useEffect(() => { flash(''); }, [s.step]);   // a toast never outlives its step
 
   // Where each account ends up this week: a "Make it a call" from Visits or a "Make it a visit" from Calls, else the
   // second-look decision, else the rep's own Friday pick.
@@ -72,7 +76,7 @@ function Session({ d, repId }) {
 
   const goStep = (k) => set((x) => ({ step: k, reached: Math.max(x.reached, k) }));
   const next = () => {
-    if (!okStep[s.step - 1]) { flash(s.step === 3 ? 'Cut visits to ' + MAX_VISITS + ' or fewer' : 'Pick a focus first'); return; }
+    if (!okStep[s.step - 1]) { flash(s.step === 3 ? 'Cut visits to ' + MAX_VISITS + ' or fewer' : 'Pick a focus first', 'warn'); return; }
     if (s.step < 6) { goStep(s.step + 1); return; }
     const plan = {
       picks: d.accounts.map((a) => ({ id: a.id, finalPick: s.removed[a.id] ? 'wait' : finalPick(a) })),
@@ -81,12 +85,15 @@ function Session({ d, repId }) {
       roleplay: { skill: s.skill, character: s.character, done: s.practiced },
       commitments: d.commitments.filter((c) => s.commit[c.key]).map((c) => c.text),
     };
-    data.saveWeekly(repId, plan).then(() => { set({ done: true }); flash('Sent to ' + rep + '’s Pulse'); }, (e) => flash(words(e)));
+    data.saveWeekly(repId, plan).then(() => { set({ done: true }); flash('Sent to ' + rep + '’s Pulse'); }, (e) => flash(words(e), 'error'));
   };
   const back = () => set((x) => ({ step: Math.max(1, x.step - 1) }));
 
+  const sessionText = '1-on-1 · ' + titleCase(d.session.dateLabel) + ' · ' + d.session.minutes + ' min';
   if (s.done) {
     return (
+      <>
+      <SessionLine text={sessionText} />
       <Done title={rep + '’s week is set'} line={visits.length + ' visits · ' + calls.length + ' calls · focus: ' + goal.name + ' · ' + s.target + ' ' + goal.action}>
         <div className="where c2">
           <section><span className="k">PULSE · TODAY</span><span className="t">{rep} confirms the week with one tap. Visits, calls and the focus appear there.</span></section>
@@ -102,9 +109,9 @@ function Session({ d, repId }) {
                   onClick={() => {
                     const commit = Object.assign({}, s.commit, { [c.key]: !s.commit[c.key] });
                     set({ commit });
-                    data.saveCommitments(repId, d.commitments.filter((k) => commit[k.key]).map((k) => k.text)).catch((e) => flash(words(e)));
+                    data.saveCommitments(repId, d.commitments.filter((k) => commit[k.key]).map((k) => k.text)).catch((e) => flash(words(e), 'error'));
                   }}>
-                  {on ? <Icon name="check" size={13} stroke={3} /> : null}{c.text}
+                  {on ? <Icon name="check" size={13} /> : null}{c.text}
                 </button>
               );
             })}
@@ -112,6 +119,7 @@ function Session({ d, repId }) {
           <span className="foot-note">Anything else {boss} agrees to is picked up from the meeting notes.</span>
         </section>
       </Done>
+      </>
     );
   }
 
@@ -119,7 +127,7 @@ function Session({ d, repId }) {
     <>
       {/* Owner 2026-10-23: the session line lives in the top bar, the step subtitles are gone, and the banner carries a
           live count of this week's visits and calls. */}
-      <SessionLine text={'1-on-1 · ' + d.session.dateLabel.toLowerCase().replace(/\b[a-z]/g, (ch) => ch.toUpperCase()) + ' · ' + d.session.minutes + ' min'} />
+      <SessionLine text={sessionText} />
       <Banner title={TITLES[s.step - 1]} center={<LiveCount visits={visits.length} calls={calls.length} />}
         steps={STEPS} step={s.step} reached={6} onStep={goStep} />
       {s.step === 1 ? <LastWeek d={d} rep={rep} /> : null}
@@ -137,11 +145,12 @@ function Session({ d, repId }) {
       {s.step === 5 ? <Calls calls={calls}
         onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }}
         onVisit={(a) => {
-          if (visits.length >= MAX_VISITS) { flash('Visits are full: ' + MAX_VISITS + ' a week'); return; }
+          if (visits.length >= MAX_VISITS) { flash('Visits are full: ' + MAX_VISITS + ' a week', 'warn'); return; }
           set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }), toCall: Object.assign({}, x.toCall, { [a.id]: false }) })); flash(a.name + ' moved to visits');
         }} /> : null}
       {s.step === 6 ? <Focus s={s} set={set} rep={rep} /> : null}
-      <Foot onBack={s.step > 1 ? back : null} onNext={next} nextLabel={s.step === 6 ? 'Save the week' : 'Next'} blocked={!okStep[s.step - 1]} />
+      <Foot onBack={s.step > 1 ? back : null} onNext={next} nextLabel={s.step === 6 ? 'Save the week' : 'Next'} blocked={!okStep[s.step - 1]}
+        hint={s.step === 6 ? 'Pick a focus to save' : null} />
     </>
   );
 }
@@ -161,7 +170,7 @@ function LastWeek({ d, rep }) {
       <div className="wins">
         {d.wins.map((w) => (
           <span key={w.title} className="win">
-            <span className="st"><Icon name="star5" size={15} stroke={2.2} /></span>
+            <span className="st"><Icon name="star5" size={15} /></span>
             <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}><span className="t">{w.title}</span><span className="s">{w.sub}</span></span>
           </span>
         ))}
@@ -177,31 +186,35 @@ function LastWeek({ d, rep }) {
             </div>
           </section>
         ) : (
-          <section className="focus-hero">
+          <section className="focus-hero none">
             <span className="top"><span className="k">LAST WEEK’S FOCUS</span></span>
             <span className="g">No focus was set last week</span>
           </section>
         )}
         <div className="lw-col">
-          <section className="stat white"><span className="k">MY FIFTY</span><span className="v">{t.fifty.count}</span><span className="s">{t.fifty.note}</span></section>
-          <section className="stat soft"><span className="k">FORECAST LANDED</span><span className="v">{t.forecastLanded.landed} of {t.forecastLanded.due}</span><span className="s">Due last week</span></section>
+          <section className="stat"><span className="k">MY FIFTY</span><span className="v">{t.fifty.count}</span><span className="s">{t.fifty.note}</span></section>
+          <section className="stat"><span className="k">FORECAST LANDED</span><span className="v">{t.forecastLanded.landed} of {t.forecastLanded.due}</span><span className="s">Due last week</span></section>
         </div>
         <div className="lw-col">
-          <section className="stat soft"><span className="k">VISITS DONE</span><span className="v">{of(t.visits)}</span><span className="s">{t.visits.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
-          <section className="stat white"><span className="k">CALLS DONE</span><span className="v">{of(t.calls)}</span><span className="s">{t.calls.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
+          <section className="stat"><span className="k">VISITS DONE</span><span className="v">{of(t.visits)}</span><span className="s">{t.visits.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
+          <section className="stat"><span className="k">CALLS DONE</span><span className="v">{of(t.calls)}</span><span className="s">{t.calls.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
         </div>
       </div>
       <div className="two">
         <section className="cc">
           <CardHead icon="pin" title="Missed visits" right={<span className="cnt">{d.missedVisits.length}</span>} />
           {d.missedVisits.length ? d.missedVisits.map((m, i) => <div key={m.name + i} className="mrow"><span className="n">{m.name}</span></div>)
-            : <span className="cc-note">None</span>}
+            : <Empty icon="check" text="None" />}
         </section>
         <section className="cc">
-          <CardHead icon="doc" title="Forecast changes" right={<span className="cnt green"><Icon name="check" size={13} stroke={2.6} />{d.checkin.submittedLabel}</span>} />
-          <div className="fc-lines">
-            {d.forecastChanges.length ? d.forecastChanges.map((c, i) => <span key={c.who + i}><b>{c.who}</b> {c.what} · {c.reason}</span>) : <span>No forecast changes</span>}
-          </div>
+          <CardHead icon="doc" title="Forecast changes" right={isSent(d.checkin.submittedLabel)
+            ? <span className="cnt green"><Icon name="check" size={13} />{d.checkin.submittedLabel}</span>
+            : <span className="cnt neutral"><Icon name="clock" size={13} />{d.checkin.submittedLabel}</span>} />
+          {d.forecastChanges.length ? (
+            <div className="fc-lines">
+              {d.forecastChanges.map((c, i) => <span key={c.who + i}><b>{c.who}</b> {c.what} · {c.reason}</span>)}
+            </div>
+          ) : <Empty icon="doc" text="No forecast changes" />}
         </section>
       </div>
     </>
@@ -211,7 +224,7 @@ function LastWeek({ d, rep }) {
 function SecondLook({ d, byId, rep, decision, onDecide }) {
   return (
     <div className="sl-list">
-      {!d.secondLook.length ? <section className="cc"><span className="cc-note">Nothing for a second look this week.</span></section> : null}
+      {!d.secondLook.length ? <section className="cc"><Empty icon="check" text="Nothing for a second look this week." /></section> : null}
       {d.secondLook.map((x) => {
         const a = byId[x.id], dec = decision[x.id];
         return (
@@ -232,26 +245,19 @@ function SecondLook({ d, byId, rep, decision, onDecide }) {
   );
 }
 
-// The session line, shown in the app bar's slot next to "Compass".
-function SessionLine({ text }) {
-  const [slot, setSlot] = useState(null);
-  useEffect(() => { setSlot(document.getElementById('cx-session')); }, []);
-  return slot ? createPortal(<span className="cx-session"><Icon name="events" size={14} stroke={2.2} />{text}</span>, slot) : null;
-}
-
 // Live count of the week: visits against the 15 cap, and calls. Bumps when a number changes.
 function LiveCount({ visits, calls }) {
   const over = visits > MAX_VISITS;
   return (
     <div className="livecount" role="status" aria-live="polite" aria-label={visits + ' of ' + MAX_VISITS + ' visits, ' + calls + ' calls'}>
       <span className={'lc' + (over ? ' over' : '')}>
-        <span className="ic"><Icon name="pin" size={16} stroke={2.2} /></span>
+        <span className="ic"><Icon name="pin" size={16} /></span>
         <span className="nums"><b key={'v' + visits} className="bump">{visits}</b><i>/ {MAX_VISITS}</i></span>
         <span className="lbl">VISITS</span>
       </span>
       <span className="div" aria-hidden="true" />
       <span className="lc">
-        <span className="ic call"><Icon name="call" size={16} stroke={2.2} /></span>
+        <span className="ic call"><Icon name="call" size={16} /></span>
         <span className="nums"><b key={'c' + calls} className="bump">{calls}</b></span>
         <span className="lbl">CALLS</span>
       </span>
@@ -263,7 +269,7 @@ function Visits({ visits, onRemove, onCall }) {
   const over = visits.length > MAX_VISITS;
   return (
     <section className="cc">
-      <CardHead icon="pin" title="Visits this week" right={<span className={'right-strong' + (over ? ' over' : '')}>{visits.length} of {MAX_VISITS}</span>} />
+      <CardHead lite icon="pin" title="Visits this week" right={<span className={'right-strong' + (over ? ' over' : '')}>{over ? <Icon name="alert" size={14} /> : null}{visits.length} of {MAX_VISITS}</span>} />
       {/* Owner 2026-10-23: no purpose notes on this step; the space goes to a capacity bar, a mix by group and a card grid. */}
       <div className="vsum">
         <div className="vcap" aria-label={visits.length + ' of ' + MAX_VISITS + ' visits'}>
@@ -282,18 +288,18 @@ function Visits({ visits, onRemove, onCall }) {
             <span className="ava">{a.ini}</span>
             <span className="tx"><b>{a.name}</b><span>{a.fact}</span>
               <span className="vfoot"><span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span>
-                <button type="button" className="tocall" onClick={() => onCall(a)}><Icon name="call" size={12} stroke={2.4} />Make it a call</button></span></span>
-            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={12} stroke={2.4} /></button>
+                <button type="button" className="minibtn tocall" onClick={() => onCall(a)}><Icon name="call" size={14} />Make it a call</button></span></span>
+            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={14} /></button>
           </div>
         ))}
       </div>
+      {!visits.length ? <Empty icon="pin" text="No visits this week" /> : null}
     </section>
   );
 }
 
 function Roleplay({ s, set, rep, boss, d, flash }) {
   const skill = skillByKey(s.skill), ch = CHARACTERS.find((c) => c.key === s.character);
-  const tone = AVATAR_TONES[CHARACTERS.indexOf(ch) % AVATAR_TONES.length];
   const clinicPlayer = s.swapped ? boss : rep, repPlayer = s.swapped ? rep : boss;
   return (
     <>
@@ -303,7 +309,7 @@ function Roleplay({ s, set, rep, boss, d, flash }) {
           {SKILLS.filter((k) => !k.monthlyOnly).map((k) => (
             <button key={k.key} type="button" role="radio" aria-checked={s.skill === k.key} className={'rchip skill' + (s.skill === k.key ? ' on' : '')}
               onClick={() => set({ skill: k.key, character: k.character, practiced: false, curve: false })}>
-              {k.name}{k.key === d.roleplay.noteSkill ? <span className="gdot" aria-label="from the Friday note" /> : null}
+              {k.name}{k.key === d.roleplay.noteSkill ? <span className="ndot" role="img" aria-label="from the Friday note"><Icon name="note" size={14} /></span> : null}
             </button>
           ))}
         </div>
@@ -312,34 +318,34 @@ function Roleplay({ s, set, rep, boss, d, flash }) {
           {CHARACTERS.map((c) => (
             <button key={c.key} type="button" role="radio" aria-checked={s.character === c.key} className={'rchip char' + (s.character === c.key ? ' on' : '')}
               onClick={() => set({ character: c.key, curve: false })}>
-              {c.name}{c.key === d.roleplay.noteCharacter ? <span className="gdot" aria-label="from the Friday note" /> : null}
+              {c.name}{c.key === d.roleplay.noteCharacter ? <span className="ndot" role="img" aria-label="from the Friday note"><Icon name="note" size={14} /></span> : null}
             </button>
           ))}
         </div>
-        <span className="rp-legend"><span className="gdot" />From {rep}’s Friday note</span>
+        <span className="rp-legend"><span className="ndot" aria-hidden="true"><Icon name="note" size={14} /></span>From {rep}’s Friday note</span>
       </section>
       <section className="scene">
         <div className="lcol">
           <span className="prac">PRACTISING · {skill.name.toUpperCase()}</span>
           <span className="role">
-            <span className="rav" style={css(tone)}>{ch.name.replace('The ', '').slice(0, 2).toUpperCase()}</span>
+            <span className="rav">{ch.name.replace('The ', '').slice(0, 2).toUpperCase()}</span>
             <span className="tx"><span className="k">{clinicPlayer.toUpperCase()} PLAYS</span><span className="nm">{ch.name}</span><span className="wh">{ch.who}</span></span>
           </span>
           <span className="role">
-            <span className="rav rep"><Icon name="person" size={16} stroke={2.2} /></span>
+            <span className="rav rep"><Icon name="person" size={16} /></span>
             <span className="tx"><span className="k">{repPlayer.toUpperCase()} PLAYS</span><span className="nm">The rep</span></span>
           </span>
         </div>
         <div className="rcol">
           <span className="bubble">{ch.line}</span>
-          {s.curve ? <span className="curve"><span className="k">CURVEBALL</span><span className="t">{ch.curve}</span></span> : null}
+          {s.curve ? <span className="curve"><Icon name="alert" size={16} /><span className="k">CURVEBALL</span><span className="t">{ch.curve}</span></span> : null}
           <div className="btns">
             {!s.curve ? <button type="button" className="sbtn curveb" onClick={() => set({ curve: true })}>Throw a curveball</button> : null}
             <button type="button" className="sbtn" onClick={() => { set((x) => ({ swapped: !x.swapped })); flash(s.swapped ? rep + ' plays the clinic again' : 'Roles swapped. ' + boss + ' plays the clinic'); }}>
-              <Icon name="swap" size={13} stroke={2.2} />Swap roles
+              <Icon name="swap" size={13} />Swap roles
             </button>
             <button type="button" className={'sbtn done' + (s.practiced ? ' ok' : '')} aria-pressed={s.practiced} onClick={() => set((x) => ({ practiced: !x.practiced }))}>
-              <Icon name="check" size={13} stroke={3} />{s.practiced ? 'Done' : 'Done, back to it'}
+              <Icon name="check" size={13} />{s.practiced ? 'Done' : 'Done, back to it'}
             </button>
           </div>
         </div>
@@ -351,18 +357,19 @@ function Roleplay({ s, set, rep, boss, d, flash }) {
 function Calls({ calls, onRemove, onVisit }) {
   return (
     <section className="cc">
-      <CardHead icon="call" title="Calls this week" right={<span className="right-strong">{calls.length} calls</span>} />
-      <span className="cc-note" style={{ marginBottom: 0 }}>A quick look. Turn any call into a visit if it deserves one.</span>
+      <CardHead lite icon="call" title="Calls this week" right={<span className="right-strong">{calls.length} calls</span>} />
+      <span className="cc-note">A quick look. Turn any call into a visit if it deserves one.</span>
       <div className="calls">
         {calls.map((a) => (
           <div key={a.id} className="callc">
             <span className="ava">{a.ini}</span>
             <span className="tx"><b>{a.name}</b><span>{a.purpose || a.suggestedReason}</span></span>
-            <button type="button" className="tovisit" onClick={() => onVisit(a)}><Icon name="pin" size={12} stroke={2.4} />Make it a visit</button>
-            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={12} stroke={2.4} /></button>
+            <button type="button" className="minibtn tovisit" onClick={() => onVisit(a)}><Icon name="pin" size={14} />Make it a visit</button>
+            <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={14} /></button>
           </div>
         ))}
       </div>
+      {!calls.length ? <Empty icon="call" text="No calls this week" /> : null}
     </section>
   );
 }
@@ -375,7 +382,7 @@ function Focus({ s, set, rep }) {
         {GOALS.map((x) => (
           <button key={x.key} type="button" role="radio" aria-checked={s.goal === x.key} className={'goal' + (s.goal === x.key ? ' on' : '')}
             onClick={() => set({ goal: x.key, target: x.target })}>
-            <span className="top"><span className="nm">{x.name}</span>{s.goal === x.key ? <span className="tick"><Icon name="check" size={12} stroke={3} /></span> : null}</span>
+            <span className="top"><span className="nm">{x.name}</span>{s.goal === x.key ? <span className="tick"><Icon name="check" size={12} /></span> : null}</span>
             <span className="df">{x.def}</span>
             <span className="rs">Result: {x.result}</span>
           </button>
@@ -386,13 +393,13 @@ function Focus({ s, set, rep }) {
           <span className="l">
             <span className="k">WEEKLY ACTION · WHAT {rep.toUpperCase()} CONTROLS</span>
             <span className="stepr">
-              <button type="button" className="circ" aria-label="Less" onClick={() => set((x) => ({ target: Math.max(1, x.target - 1) }))}><Icon name="minus" size={16} stroke={2.6} /></button>
+              <button type="button" className="circ" aria-label="Less" onClick={() => set((x) => ({ target: Math.max(1, x.target - 1) }))}><Icon name="minus" size={16} /></button>
               <span className="num" aria-live="polite">{s.target}</span>
-              <button type="button" className="circ plus" aria-label="More" onClick={() => set((x) => ({ target: Math.min(15, x.target + 1) }))}><Icon name="plus" size={16} stroke={2.6} /></button>
+              <button type="button" className="circ plus" aria-label="More" onClick={() => set((x) => ({ target: Math.min(15, x.target + 1) }))}><Icon name="plus" size={16} /></button>
               <span className="act">{g.action}</span>
             </span>
           </span>
-          <span className="r"><span className="k">RESULT WE TRACK</span><span className="v">{g.result}</span><span className="s">Counted from Pulse and orders</span></span>
+          <span className="r"><span className="k">RESULT WE TRACK</span><span className="v">{cap(g.result)}</span><span className="s">Counted from Pulse and orders</span></span>
         </div>
       ) : null}
     </>

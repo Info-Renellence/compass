@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { data, isSample, words } from './data/index.js';
 import { Icon } from './icons.jsx';
-import { ToastHost } from './ui.jsx';
+import { Skeleton, ToastHost } from './ui.jsx';
 import Weekly from './weekly/Weekly.jsx';
 import Monthly from './monthly/Monthly.jsx';
 
@@ -54,7 +54,7 @@ export default function App() {
         <header className="cx-bar">
           <img className="logo" src="/logo.png" alt="Renellence" />
           <span className="sep" aria-hidden="true" />
-          <span className="cx-brand"><span className="mark"><Icon name="compass" size={16} stroke={2.2} /></span>Compass</span>
+          <span className="cx-brand"><span className="mark"><Icon name="compass" size={16} /></span>Compass</span>
           <span id="cx-session" className="cx-session-slot" />
           <span style={{ flex: 1 }} />
           <nav style={{ display: 'flex', gap: 18 }} aria-label="Sessions">
@@ -64,7 +64,7 @@ export default function App() {
           {rep ? (
             <div className="cx-who">
               <button type="button" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
-                <span className="ava">{rep.ini}</span>{rep.first}
+                <span className="ava">{rep.ini}</span>{rep.first}<Icon name="chevronDown" size={14} className="chev" />
               </button>
               {menu ? (
                 <div className="cx-menu" role="menu">
@@ -72,18 +72,18 @@ export default function App() {
                   {sess.reps.map((r) => (
                     <button key={r.id} type="button" role="menuitemradio" aria-checked={r.id === repId} className={r.id === repId ? 'on' : ''}
                       onClick={() => { setRepId(r.id); setMenu(false); }}>
-                      <span className="ava" style={{ width: 26, height: 26, fontSize: 10 }}>{r.ini}</span>{r.first} {r.last}
+                      <span className="ava">{r.ini}</span>{r.first} {r.last}
                     </button>
                   ))}
                   {!isSample ? <button type="button" role="menuitem" onClick={() => { data.signOut(); if (window.google && window.google.accounts) window.google.accounts.id.disableAutoSelect(); window.location.href = '/'; }}>Sign out</button> : null}
-                  {isSample ? <div className="lbl" style={{ paddingTop: 10 }}><span className="cx-sample">Sample data · nothing is saved</span></div> : null}
+                  {isSample ? <div className="lbl sample-row"><span className="cx-sample">Sample data · nothing is saved</span></div> : null}
                 </div>
               ) : null}
             </div>
-          ) : null}
+          ) : <span className="cx-who-skel" aria-hidden="true"><span className="skel c" /><span className="skel b" /></span>}
         </header>
         <main className="cx-main">
-          {!repId ? <div className="loading">Loading…</div>
+          {!repId ? <Skeleton />
             : view === 'monthly' ? <Monthly key={'m' + repId} repId={repId} /> : <Weekly key={'w' + repId} repId={repId} />}
         </main>
       </div>
@@ -110,14 +110,15 @@ function SignIn({ error, refused, onIn, onError }) {
     }
     data.config().then((c) => (c.googleClientId ? start(c.googleClientId) : setMsg('Sign-in isn’t set up on this deployment.')), () => setMsg('Compass can’t be reached right now.'));
   }, []);
+  const shown = error || msg;
   return (
-    <div className="cx">
-      <main className="cx-main" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, minHeight: '70vh' }}>
-        <img className="logo" src="/logo.png" alt="Renellence" style={{ height: 28 }} />
-        <h1 style={{ margin: 0, fontSize: 24 }}>Compass</h1>
-        <span>Sign in with your Renellence Google account.</span>
+    <div className="cx signin-page">
+      <main className="signin-card">
+        <img className="logo" src="/logo.png" alt="Renellence" />
+        <span className="signin-brand"><span className="mark"><Icon name="compass" size={20} /></span><h1>Compass</h1></span>
+        <span className="signin-sub">Sign in with your Renellence Google account.</span>
         <div ref={btn} />
-        {msg || error ? <span role="alert" style={{ color: '#B42318' }}>{msg || error}</span> : null}
+        {shown ? <span role="alert" className="signin-err"><Icon name="alert" size={16} />{shown}</span> : null}
       </main>
     </div>
   );

@@ -5,17 +5,19 @@ import { useEffect, useState } from 'react';
 import { data, words } from '../data/index.js';
 import { goalByKey, SKILLS, skillByKey, FIFTY_STATUS } from '../data/catalog.js';
 import { Icon } from '../icons.jsx';
-import { Banner, CardHead, Foot, Done, money, useToast } from '../ui.jsx';
+import { Banner, CardHead, Foot, Done, Empty, ErrorCard, SessionLine, Skeleton, money, titleCase, useToast } from '../ui.jsx';
 
 const STEPS = ['Last month', 'Next month', 'My Fifty', 'Growth'];
-const css = (s) => Object.fromEntries(s.split(';').filter(Boolean).map((p) => { const [k, v] = p.split(':'); return [k.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), v]; }));
 
 const fresh = (d) => ({ step: 1, done: false, added: {}, status: Object.fromEntries(d.fifty.map((f) => [f.id, f.suggested])), skill: d.monthSkill });
 
 export default function Monthly({ repId }) {
   const [d, setD] = useState(null);
-  useEffect(() => { data.monthly(repId).then(setD); }, [repId]);
-  if (!d) return <div className="loading">Loading…</div>;
+  const [err, setErr] = useState('');
+  const load = () => { setErr(''); data.monthly(repId).then(setD, (e) => setErr(words(e))); };
+  useEffect(load, [repId]);
+  if (err) return <ErrorCard text={err} onRetry={load} />;
+  if (!d) return <Skeleton />;
   return <Session d={d} repId={repId} />;
 }
 
@@ -28,15 +30,20 @@ function Session({ d, repId }) {
   const base = nm.forecast.reduce((t, f) => t + f.amount, 0);
   const total = base + nm.gap.reduce((t, g) => t + (s.added[g.id] ? g.amount : 0), 0);
   const skill = skillByKey(s.skill);
+  useEffect(() => { flash(''); }, [s.step]);   // a toast never outlives its step
+  // Owner 2026-10-23 (UI polish): the monthly banner matches the weekly one; the session line lives in the top bar.
+  const sessionText = 'Monthly 1-on-1 · ' + titleCase(m.dateLabel) + ' · ' + m.minutes + ' min';
 
   const next = () => {
     if (s.step < 4) { set({ step: s.step + 1 }); return; }
     const plan = { addedForecasts: nm.gap.filter((g) => s.added[g.id]).map((g) => g.id), fiftyStatus: d.fifty.map((f) => ({ id: f.id, status: s.status[f.id] })), skill: s.skill };
-    data.saveMonthly(repId, plan).then(() => { set({ done: true }); flash(m.nextMonth + ' saved'); }, (e) => flash(words(e)));
+    data.saveMonthly(repId, plan).then(() => { set({ done: true }); flash(m.nextMonth + ' saved'); }, (e) => flash(words(e), 'error'));
   };
 
   if (s.done) {
     return (
+      <>
+      <SessionLine text={sessionText} />
       <Done wide title={m.nextMonth + ' is set'} line={(nm.target ? 'Target ' + money(nm.target) : 'No target set') + ' · ' + rep + ' forecasts ' + money(total) + ' · skill: ' + skill.name}>
         <div className="where c3">
           <section><span className="k">EDGE · FORECAST</span><span className="t">New {m.nextMonth} forecasts added</span></section>
@@ -44,16 +51,16 @@ function Session({ d, repId }) {
           <section><span className="k">WEEKLY 1-ON-1s</span><span className="t">Skill of the month in roleplays</span></section>
         </div>
       </Done>
+      </>
     );
   }
 
   const titles = ['How ' + m.lastMonth + ' went', m.nextMonth + ': target and forecast', 'My Fifty check', 'Growth and feedback'];
-  const subs = ['Results against target, and why forecasts moved.', 'Start from the target, build the forecast, close the gap together.',
-    'A quick status on every account in My Fifty.', 'One skill for the month, and a real conversation.'];
 
   return (
     <>
-      <Banner kicker={'MONTHLY 1-ON-1 · ' + m.dateLabel + ' · ' + m.minutes + ' MIN'} title={titles[s.step - 1]} sub={subs[s.step - 1]}
+      <SessionLine text={sessionText} />
+      <Banner title={titles[s.step - 1]}
         steps={STEPS} step={s.step} reached={4} onStep={(k) => set({ step: k })} />
       {s.step === 1 ? <LastMonth d={d} rep={rep} /> : null}
       {s.step === 2 ? <NextMonth d={d} rep={rep} base={base} total={total} added={s.added}
@@ -81,8 +88,8 @@ function LastMonth({ d, rep }) {
           <span className="bar"><span style={{ width: Math.min(100, pct || 0) + '%' }} /></span>
           <span className="s">{pct == null ? '' : (short > 0 ? money(short) + ' short' : money(-short) + ' over')}{l.prevPercent != null ? ' · ' + m.prevMonth + ' was ' + l.prevPercent + '%' : ''}</span>
         </section>
-        <section className="stat white"><span className="k">FORECAST ACCURACY</span><span className="v lg">{l.forecastAccuracy == null ? '—' : l.forecastAccuracy + '%'}</span><span className="s">{l.forecastAccuracy == null ? 'No forecast snapshot on ' + l.accuracyNote : 'Of what ' + rep + ' forecast on ' + l.accuracyNote + ', this much ordered'}</span></section>
-        <section className="stat soft"><span className="k">MY FIFTY</span><span className="v lg">{l.fifty.count}</span><span className="s">{l.fifty.note}</span></section>
+        <section className="stat"><span className="k">FORECAST ACCURACY</span><span className="v lg">{l.forecastAccuracy == null ? '—' : l.forecastAccuracy + '%'}</span><span className="s">{l.forecastAccuracy == null ? 'No forecast snapshot on ' + l.accuracyNote : 'Of what ' + rep + ' forecast on ' + l.accuracyNote + ', this much ordered'}</span></section>
+        <section className="stat"><span className="k">MY FIFTY</span><span className="v lg">{l.fifty.count}</span><span className="s">{l.fifty.note}</span></section>
       </div>
       <div className="two">
         <section className="cc">
@@ -90,15 +97,15 @@ function LastMonth({ d, rep }) {
           {l.slipped.map(([why, n]) => (
             <div key={why} className="slip"><span className="n">{why}</span><span className="hbar"><span style={{ width: (n / max * 100) + '%' }} /></span><span className="c">{n}</span></div>
           ))}
-          {!l.slipped.length ? <span className="cc-note">No forecast changes from Friday check-ins</span> : null}
+          {!l.slipped.length ? <Empty icon="forecast" text="No forecast changes from Friday check-ins" /> : null}
           {l.pattern ? <span className="pattern"><b>Pattern:</b> {l.pattern}</span> : null}
         </section>
         <section className="cc">
-          <CardHead icon="star5" title="Weekly focus this month" right={<span className="right-note">Action hit {hits} of {l.focusWeeks.length} weeks</span>} />
-          {!l.focusWeeks.length ? <span className="cc-note">No weekly focus was set</span> : null}
+          <CardHead icon="star5" title="Weekly focus this month" right={l.focusWeeks.length ? <span className="right-note">Action hit {hits} of {l.focusWeeks.length} weeks</span> : null} />
+          {!l.focusWeeks.length ? <Empty icon="star5" text="No weekly focus was set" /> : null}
           {l.focusWeeks.map((w) => (
             <div key={w.week} className="wk"><span className="d">{w.week}</span><span className="g">{goalByKey(w.goal).name}</span>
-              <span className={'hit' + (w.done >= w.target ? ' yes' : '')}>{w.done} of {w.target}</span></div>
+              <span className={'hit' + (w.done >= w.target ? ' yes' : '')}>{w.done >= w.target ? <Icon name="check" size={12} /> : null}{w.done} of {w.target}</span></div>
           ))}
         </section>
       </div>
@@ -119,7 +126,7 @@ function NextMonth({ d, rep, base, total, added, onToggle }) {
           <span><span className="k blue">{rep.toUpperCase()}’S FORECAST</span><span className="v blue">{money(total)}</span><span className="s">{tgt ? pctOf(total) + '% of target' : ''}</span></span>
           <span className="gap"><span className="k">GAP</span><span className={'v' + (gap > 0 ? '' : ' green')}>{gap > 0 ? money(gap) : 'Covered'}</span><span className="s">{gap > 0 ? 'still to find' : money(-gap) + ' over target'}</span></span>
         </div>
-        <span className="gbar" role="img" aria-label={pctOf(total) + '% of target'}><span style={{ width: (tgt ? Math.min(100, total / tgt * 100) : 0).toFixed(1) + '%' }} /></span>
+        <span className="gbar" role="img" aria-label={pctOf(total) + '% of target'}><span style={{ transform: 'scaleX(' + (tgt ? Math.min(1, total / tgt) : 0).toFixed(3) + ')' }} /></span>
       </section>
       <div className="nm-grid">
         <section className="cc">
@@ -127,6 +134,7 @@ function NextMonth({ d, rep, base, total, added, onToggle }) {
           {nm.forecast.map((f) => (
             <div key={f.id} className="frow"><span className="ava">{f.ini}</span><span className="tx"><b>{f.name}</b><span>{f.why}</span></span><span className="amt">{money(f.amount)}</span></div>
           ))}
+          {!nm.forecast.length ? <Empty icon="forecast" text="Nothing forecast yet" /> : null}
         </section>
         <section className="cc">
           <CardHead icon="sparkle" title="Could close the gap" right={<span className="right-note">Accounts with no {m.nextMonth} forecast yet</span>} />
@@ -136,11 +144,12 @@ function NextMonth({ d, rep, base, total, added, onToggle }) {
               <div key={g.id} className={'grow-row' + (on ? ' on' : '')}>
                 <span className="ava">{g.ini}</span><span className="tx"><b>{g.name}</b><span>{g.why}</span></span><span className="amt">{money(g.amount)}</span>
                 <button type="button" className={'addb' + (on ? ' on' : '')} aria-pressed={on} onClick={() => onToggle(g)}>
-                  {on ? <><Icon name="check" size={12} stroke={3} />Added</> : '+ Add'}
+                  {on ? <><Icon name="check" size={14} />Added</> : <><Icon name="plus" size={14} />Add</>}
                 </button>
               </div>
             );
           })}
+          {!nm.gap.length ? <Empty icon="check" text="No accounts without a forecast" /> : null}
         </section>
       </div>
     </>
@@ -152,9 +161,9 @@ function FiftyCheck({ d, status, onPick }) {
   return (
     <>
       <div className="three">
-        <section className="stat ring-g"><span className="k">ON TRACK</span><span className="v lg">{n('on_track')}</span><span className="s">Ordering on rhythm</span></section>
-        <section className="stat ring-y"><span className="k">WATCH</span><span className="v lg">{n('watch')}</span><span className="s">Something to sort out</span></section>
-        <section className="stat ring-r"><span className="k">AT RISK</span><span className="v lg">{n('at_risk')}</span><span className="s">Going cold</span></section>
+        <section className="stat ring-g"><span className="k"><Icon name="check" size={14} />ON TRACK</span><span className="v lg">{n('on_track')}</span><span className="s">Ordering on rhythm</span></section>
+        <section className="stat ring-y"><span className="k"><Icon name="clock" size={14} />WATCH</span><span className="v lg">{n('watch')}</span><span className="s">Something to sort out</span></section>
+        <section className="stat ring-r"><span className="k"><Icon name="alert" size={14} />AT RISK</span><span className="v lg">{n('at_risk')}</span><span className="s">Going cold</span></section>
       </div>
       <section className="cc">
         <CardHead icon="person" title="Every My Fifty account" right={<span className="right-note">Once a month, every account gets a status</span>} />
@@ -166,15 +175,15 @@ function FiftyCheck({ d, status, onPick }) {
               {FIFTY_STATUS.map((o) => {
                 const on = status[f.id] === o.key;
                 return (
-                  <button key={o.key} type="button" role="radio" aria-checked={on} className="sopt"
-                    style={on ? Object.assign(css(o.on), { border: 0, boxShadow: 'inset 0 0 0 1.5px ' + o.dot }) : undefined} onClick={() => onPick(f.id, o.key)}>
-                    <span className="dot" style={{ background: o.dot }} />{o.label}
+                  <button key={o.key} type="button" role="radio" aria-checked={on} className={'sopt ' + o.key + (on ? ' on' : '')} onClick={() => onPick(f.id, o.key)}>
+                    <span className="dot" />{o.label}
                   </button>
                 );
               })}
             </span>
           </div>
         ))}
+        {!d.fifty.length ? <Empty icon="person" text="No My Fifty accounts yet" /> : null}
       </section>
     </>
   );
@@ -188,7 +197,7 @@ function Growth({ month, boss, skill, onSkill }) {
         <div className="mskills" role="radiogroup" aria-label={'Skill for ' + month}>
           {SKILLS.map((k) => (
             <button key={k.key} type="button" role="radio" aria-checked={skill === k.key} className={'mskill' + (skill === k.key ? ' on' : '')} onClick={() => onSkill(k.key)}>
-              {k.name}{skill === k.key ? <span className="tick"><Icon name="check" size={12} stroke={3} /></span> : null}
+              {k.name}{skill === k.key ? <span className="tick"><Icon name="check" size={12} /></span> : null}
             </button>
           ))}
         </div>

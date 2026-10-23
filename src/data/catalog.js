@@ -39,9 +39,9 @@ export const CHARACTERS = [
 export const PICKS = { visit: 'Visit', call: 'Call', wait: 'Wait', park: 'Park' };
 export const GROUPS = { candidate: 'Candidate', onboarded: 'Onboarded', fifty: 'My Fifty', lead: 'Lead' };
 
-// My Fifty monthly status.
+// My Fifty monthly status. Colours come from the status classes in compass.css (.sopt.on_track / .watch / .at_risk).
 export const FIFTY_STATUS = [
-  { key: 'on_track', label: 'On track', dot: '#2E9E5B', on: 'background:#E6F4EA;color:#1E7B3C' },
-  { key: 'watch', label: 'Watch', dot: '#F0A51A', on: 'background:#FFF1D6;color:#8A5A00' },
-  { key: 'at_risk', label: 'At risk', dot: '#B42318', on: 'background:#FDE7E7;color:#B42318' },
+  { key: 'on_track', label: 'On track' },
+  { key: 'watch', label: 'Watch' },
+  { key: 'at_risk', label: 'At risk' },
 ];
