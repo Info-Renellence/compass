@@ -124,7 +124,7 @@ async function gapRows(sql, x, monthKey) {
 
 // The status suggested for a My Fifty account from its order rhythm.
 function suggestedStatus(p, x) {
-  if (p.coldDays >= x.cfg.compass.fifty_quiet_days) return 'at_risk';
+  if (p.coldDays > x.cfg.compass.fifty_quiet_days) return 'at_risk';   // more than N days, as Edge and Pulse
   if (x.late[p.id] || x.failedAt[p.id]) return 'watch';
   return 'on_track';
 }

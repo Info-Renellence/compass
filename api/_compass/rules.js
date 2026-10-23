@@ -143,7 +143,7 @@ function fact(p, x) {
   if (g === 'fifty') {
     if (x.late[p.id]) return 'Late forecast ' + kMoney(x.late[p.id].amount) + ' · last order ' + short(p.lastOrderAt);
     if (x.failedAt[p.id]) return 'Card declined ' + short(x.failedAt[p.id]);
-    if (p.coldDays >= x.cfg.compass.fifty_quiet_days) return 'No order or visit since ' + short(p.lastActiveAt);
+    if (p.coldDays > x.cfg.compass.fifty_quiet_days) return 'No order or visit since ' + short(p.lastActiveAt);
     return 'Ordered ' + short(p.lastOrderAt);
   }
   const src = p.sourceKind === 'social' ? 'Meta lead · came in ' + short(p.createdAt)
@@ -163,7 +163,7 @@ function suggest(p, x) {
     if (d != null && d > 14) return ['visit', 'Signed ' + d + ' days ago and still no samples. Drop samples.'];
     return ['visit', (d != null ? 'Signed ' + d + ' days ago' : 'Signed') + ' with no samples. Drop samples while it’s fresh.'];
   }
-  if (g === 'fifty' && p.coldDays >= c.fifty_quiet_days) return ['visit', 'Going cold · ' + p.coldDays + ' days. Go in person.'];
+  if (g === 'fifty' && p.coldDays > c.fifty_quiet_days) return ['visit', 'Going cold · ' + p.coldDays + ' days. Go in person.'];
   if (x.late[p.id]) return x.biggestLate === p.id ? ['visit', 'Biggest late forecast. Confirm the order or a new date.'] : ['call', 'Late forecast. Ask for the new date.'];
   if (x.failedAt[p.id]) return ['call', 'Payment failed. Send a new link.'];
   const ev = x.eventAt[p.id];

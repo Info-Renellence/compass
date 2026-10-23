@@ -104,6 +104,25 @@ test('monthly_save: skill, gap forecast, My Fifty statuses, committed forecast; 
   eq((await h.post(admin, 'monthly_save', { repId: rep.id, plan: { addedForecasts: [], fiftyStatus: [{ id: admin.id, status: 'watch' }], skill: 'ask_for_order' } })).data.error, 'not_in_fifty');
 });
 
+// Run 3 (2026-10-23): going cold is MORE than fifty_quiet_days with no order or visit, as Edge's check-in (checkin.js
+// suggest, `>`), book.js goingCold and Pulse's rule ("more than 30 days"). At exactly 30 days Compass said Visit /
+// "Going cold" / at risk while Edge's check-in said nothing was due.
+test('going cold at exactly 30 days is not yet cold (as Edge and Pulse); at 31 it is', async (sql) => {
+  const { admin, rep } = await setup(sql);
+  const d30 = await h.contact(sql, rep, { first: 'Thirty', last: 'Sample' });
+  await h.order(sql, d30.id, { at: h.ago(60) });
+  await h.order(sql, d30.id, { at: h.ago(30) });
+  const d31 = await h.contact(sql, rep, { first: 'Thirtyone', last: 'Sample' });
+  await h.order(sql, d31.id, { at: h.ago(60) });
+  await h.order(sql, d31.id, { at: h.ago(31) });
+  const by = Object.fromEntries((await h.get(admin, 'weekly', { rep: rep.id })).data.accounts.map((a) => [a.id, a]));
+  ok(!/Going cold/.test(by[d30.id].suggestedReason) && by[d30.id].suggestedPick !== 'visit', '30 days: ' + JSON.stringify(by[d30.id]));
+  ok(!/No order or visit since/.test(by[d30.id].fact), '30 days fact: ' + by[d30.id].fact);
+  eq([by[d31.id].suggestedPick, /Going cold · 31 days/.test(by[d31.id].suggestedReason)], ['visit', true], '31 days');
+  const f = Object.fromEntries((await h.get(admin, 'monthly', { rep: rep.id })).data.fifty.map((x) => [x.id, x.suggested]));
+  eq([f[d30.id], f[d31.id]], ['on_track', 'at_risk'], 'My Fifty status suggestion');
+});
+
 // Against Edge's committed files (git HEAD), so work in progress in Edge doesn't fail Compass.
 test('shared rules are exact copies of Edge\'s committed ones (never forked)', async () => {
   const edge = path.join(h.ROOT, '..', 'renellence-edge');
