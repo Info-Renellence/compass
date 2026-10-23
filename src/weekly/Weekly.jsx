@@ -20,7 +20,7 @@ function fresh(d) {
   const month = skillByKey(d.roleplay.monthSkill) || SKILLS[0];
   return {
     step: 1, reached: 1, done: false,
-    decision: {}, removed: {}, toVisit: {},
+    decision: {}, removed: {}, toVisit: {}, toCall: {},
     goal: null, target: 3,
     skill: month.key, character: month.character || 'skeptic', practiced: false, curve: false, swapped: false,
     commit: Object.fromEntries(d.commitments.map((c) => [c.key, !!c.on])),
@@ -41,9 +41,10 @@ function Session({ d, repId }) {
   const rep = d.rep.first, boss = d.manager.first;
   const byId = useMemo(() => Object.fromEntries(d.accounts.map((a) => [a.id, a])), [d]);
 
-  // Where each account ends up this week: a "Make it a visit" from Calls, else the second-look decision, else the
-  // rep's own Friday pick.
+  // Where each account ends up this week: a "Make it a call" from Visits or a "Make it a visit" from Calls, else the
+  // second-look decision, else the rep's own Friday pick.
   const finalPick = (a) => {
+    if (s.toCall[a.id]) return 'call';
     if (s.toVisit[a.id]) return 'visit';
     return s.decision[a.id] === 'change' ? a.suggestedPick : a.repPick;
   };
@@ -107,13 +108,17 @@ function Session({ d, repId }) {
           set((x) => ({ decision: Object.assign({}, x.decision, { [id]: v }) }));
           if (v === 'change') flash(byId[id].name + ' → ' + PICKS[byId[id].suggestedPick]);
         }} /> : null}
-      {s.step === 3 ? <Visits visits={visits} onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }} /> : null}
+      {s.step === 3 ? <Visits visits={visits} onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }}
+        onCall={(a) => {
+          set((x) => ({ toCall: Object.assign({}, x.toCall, { [a.id]: true }), toVisit: Object.assign({}, x.toVisit, { [a.id]: false }) }));
+          flash(a.name + ' moved to calls');
+        }} /> : null}
       {s.step === 4 ? <Roleplay s={s} set={set} rep={rep} boss={boss} d={d} flash={flash} /> : null}
       {s.step === 5 ? <Calls calls={calls}
         onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }}
         onVisit={(a) => {
           if (visits.length >= MAX_VISITS) { flash('Visits are full: 15 a week'); return; }
-          set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }) })); flash(a.name + ' moved to visits');
+          set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }), toCall: Object.assign({}, x.toCall, { [a.id]: false }) })); flash(a.name + ' moved to visits');
         }} /> : null}
       {s.step === 6 ? <Focus s={s} set={set} rep={rep} /> : null}
       <Foot onBack={s.step > 1 ? back : null} onNext={next} nextLabel={s.step === 6 ? 'Save the week' : 'Next'} blocked={!okStep[s.step - 1]} />
@@ -197,7 +202,7 @@ function SecondLook({ d, byId, rep, decision, onDecide }) {
   );
 }
 
-function Visits({ visits, onRemove }) {
+function Visits({ visits, onRemove, onCall }) {
   const over = visits.length > MAX_VISITS;
   return (
     <section className="cc">
@@ -218,7 +223,9 @@ function Visits({ visits, onRemove }) {
         {visits.map((a) => (
           <div key={a.id} className="vcard">
             <span className="ava">{a.ini}</span>
-            <span className="tx"><b>{a.name}</b><span>{a.fact}</span><span><span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span></span></span>
+            <span className="tx"><b>{a.name}</b><span>{a.fact}</span>
+              <span className="vfoot"><span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span>
+                <button type="button" className="tocall" onClick={() => onCall(a)}><Icon name="call" size={12} stroke={2.4} />Make it a call</button></span></span>
             <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => onRemove(a)}><Icon name="x" size={12} stroke={2.4} /></button>
           </div>
         ))}
