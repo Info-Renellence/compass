@@ -1,0 +1,38 @@
+/* Copied from renellence-edge/web/src/styles.css (no-hubspot, 2026-10-23): Edge's design tokens, base rules and the
+   shared components Compass uses (buttons, chips, pills, segmented control). Keep in sync with Edge by hand; Compass's
+   own rules live in compass.css. */
+:root {
+  --navy: #062064; --blue: #1170C0; --blue-2: #1A80D6; --blue-soft: #EAF3FC;
+  --page: #F2F3F7; --card: #FFFFFF; --muted: #5F6878; --faint: #9AA1AD; --faint-2: #8A93A3;
+  --line: #ECEDF0; --line-2: #E3E6EC; --input: #D5DAE3; --chip: #EEF2F8; --track: #E6EAF0;
+  --red: #B42318; --red-soft: #FDE7E7; --red-ring: #F3C9C5;
+  --green: #1E7B3C; --green-soft: #E6F4EA; --green-dot: #2E9E5B;
+  --amber: #8A5A00; --amber-soft: #FFF1D6; --note-soft: #FFF6DC; --note: #5C4300;
+  --gold-1: #FFD86B; --gold-2: #F5B21F; --gold-ink: #5C3B00;
+  --shadow-pop: 0 12px 32px rgba(6, 32, 100, 0.18), 0 0 0 1px #E3E6EC;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+}
+* { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+html, body { margin: 0; background: var(--page); color: var(--navy); font: 14px/1.4 var(--font); }
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.pill { height: 26px; padding: 0 10px; border-radius: 13px; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; white-space: nowrap; flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { height: 36px; padding: 0 14px; border-radius: 18px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; border: 1px solid var(--input); background: #fff; color: var(--navy); }
+.chip.on { border: 0; background: var(--blue); color: #fff; }
+.btn { height: 40px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; border: 1px solid var(--input); background: #fff; color: var(--navy); }
+.btn:hover { border-color: #B9C1CE; }
+.btn.primary { border: 0; background: var(--blue); color: #fff; }
+.btn.primary:hover { background: #0E63AC; }
+.btn.primary:disabled, .btn:disabled { background: var(--line-2); color: var(--faint-2); border: 0; cursor: default; }
+.btn.block { width: 100%; height: 48px; border-radius: 14px; font-size: 16px; font-weight: 700; }
+.btn.done { border: 0; background: var(--green-soft); color: var(--green); }
+.btn.sm { height: 34px; padding: 0 12px; font-size: 13px; }
+.seg { display: inline-flex; background: var(--chip); border-radius: 12px; padding: 4px; gap: 2px; }
+.seg button { border: 0; background: transparent; height: 32px; padding: 0 14px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.seg .count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
