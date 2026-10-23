@@ -41,6 +41,7 @@ export default function App() {
           <img className="logo" src="/logo.png" alt="Renellence" />
           <span className="sep" aria-hidden="true" />
           <span className="cx-brand"><span className="mark"><Icon name="compass" size={16} stroke={2.2} /></span>Compass</span>
+          <span id="cx-session" className="cx-session-slot" />
           <span style={{ flex: 1 }} />
           <nav style={{ display: 'flex', gap: 18 }} aria-label="Sessions">
             <button type="button" className={'cx-tab' + (view === 'weekly' ? ' on' : '')} aria-current={view === 'weekly' ? 'page' : undefined} onClick={() => go('weekly')}>Weekly</button>

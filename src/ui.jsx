@@ -6,15 +6,16 @@ export const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-
 
 // The light-blue banner: small caps kicker, the step title, a one-line subtitle, and the stepper in a white pill.
 // A step is reachable once the session has got that far (`reached`), like the handoff's prototype.
-export function Banner({ kicker, title, sub, steps, step, reached, onStep }) {
+export function Banner({ kicker, title, sub, center, steps, step, reached, onStep }) {
   return (
-    <div className="banner">
+    <div className={'banner' + (center ? ' has-center' : '')}>
       <span className="glow" aria-hidden="true" />
       <div className="txt">
-        <span className="kicker">{kicker}</span>
+        {kicker ? <span className="kicker">{kicker}</span> : null}
         <h1 className="title">{title}</h1>
-        <span className="sub">{sub}</span>
+        {sub ? <span className="sub">{sub}</span> : null}
       </div>
+      {center ? <div className="bcenter">{center}</div> : null}
       <nav className="stepper" aria-label="Steps">
         {steps.map((label, i) => {
           const k = i + 1, on = k === step, done = k < step;

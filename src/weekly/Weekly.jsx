@@ -2,6 +2,7 @@
 // roleplay -> calls -> one focus -> done. No typing during the meeting: purposes and next steps come from the
 // meeting notes afterwards. No "AI" wording, no "flagged", no counts of changed suggestions.
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { data } from '../data/index.js';
 import { GOALS, goalByKey, SKILLS, CHARACTERS, skillByKey, PICKS } from '../data/catalog.js';
 import { Icon } from '../icons.jsx';
@@ -94,13 +95,12 @@ function Session({ d, repId }) {
     );
   }
 
-  const subs = ['', 'A few picks worth talking through together.', 'Agree on each visit and why it matters.',
-    'A five-minute break. Pick a skill and a character, then play it out.', 'A quick look. Turn any call into a visit.',
-    'One goal, and the weekly action ' + rep + ' controls.'];
-
   return (
     <>
-      <Banner kicker={'1-ON-1 · ' + d.session.dateLabel + ' · ' + d.session.minutes + ' MIN'} title={TITLES[s.step - 1]} sub={subs[s.step - 1]}
+      {/* Owner 2026-10-23: the session line lives in the top bar, the step subtitles are gone, and the banner carries a
+          live count of this week's visits and calls. */}
+      <SessionLine text={'1-on-1 · ' + d.session.dateLabel.toLowerCase().replace(/\b[a-z]/g, (ch) => ch.toUpperCase()) + ' · ' + d.session.minutes + ' min'} />
+      <Banner title={TITLES[s.step - 1]} center={<LiveCount visits={visits.length} calls={calls.length} />}
         steps={STEPS} step={s.step} reached={6} onStep={goStep} />
       {s.step === 1 ? <LastWeek d={d} rep={rep} /> : null}
       {s.step === 2 ? <SecondLook d={d} byId={byId} rep={rep} decision={s.decision}
@@ -198,6 +198,33 @@ function SecondLook({ d, byId, rep, decision, onDecide }) {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+// The session line, shown in the app bar's slot next to "Compass".
+function SessionLine({ text }) {
+  const [slot, setSlot] = useState(null);
+  useEffect(() => { setSlot(document.getElementById('cx-session')); }, []);
+  return slot ? createPortal(<span className="cx-session"><Icon name="events" size={14} stroke={2.2} />{text}</span>, slot) : null;
+}
+
+// Live count of the week: visits against the 15 cap, and calls. Bumps when a number changes.
+function LiveCount({ visits, calls }) {
+  const over = visits > MAX_VISITS;
+  return (
+    <div className="livecount" role="status" aria-live="polite" aria-label={visits + ' of ' + MAX_VISITS + ' visits, ' + calls + ' calls'}>
+      <span className={'lc' + (over ? ' over' : '')}>
+        <span className="ic"><Icon name="pin" size={16} stroke={2.2} /></span>
+        <span className="nums"><b key={'v' + visits} className="bump">{visits}</b><i>/ {MAX_VISITS}</i></span>
+        <span className="lbl">VISITS</span>
+      </span>
+      <span className="div" aria-hidden="true" />
+      <span className="lc">
+        <span className="ic call"><Icon name="call" size={16} stroke={2.2} /></span>
+        <span className="nums"><b key={'c' + calls} className="bump">{calls}</b></span>
+        <span className="lbl">CALLS</span>
+      </span>
     </div>
   );
 }
