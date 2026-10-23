@@ -19,6 +19,15 @@ const cap = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 const isSent = (label) => /^Sent\b/.test(label || '');
 // A card that leaves a list (removed, or moved to the other list) plays a 150ms exit first, unless motion is reduced.
 const reduced = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+// The weekly focus hit (one of the three celebrations): shown once per rep and focus week on this device. Remembered in
+// localStorage (a convenience; if storage is blocked it just shows again) and in memory for this page.
+const seenHits = new Set();
+function firstViewOfHit(key) {
+  if (seenHits.has(key)) return false;
+  seenHits.add(key);
+  try { if (localStorage.getItem(key)) return false; localStorage.setItem(key, '1'); } catch (e) { /* storage blocked */ }
+  return true;
+}
 function useLeaving() {
   const [gone, setGone] = useState({});
   const leave = (a, fn) => {
@@ -141,7 +150,7 @@ function Session({ d, repId }) {
       <SessionLine text={sessionText} />
       <Banner title={TITLES[s.step - 1]} center={<LiveCount visits={visits.length} calls={calls.length} />}
         steps={STEPS} step={s.step} reached={6} onStep={goStep} />
-      {s.step === 1 ? <LastWeek d={d} rep={rep} /> : null}
+      {s.step === 1 ? <LastWeek d={d} rep={rep} repId={repId} /> : null}
       {s.step === 2 ? <SecondLook d={d} byId={byId} rep={rep} decision={s.decision}
         onDecide={(id, v) => {
           set((x) => ({ decision: Object.assign({}, x.decision, { [id]: v }) }));
@@ -166,8 +175,11 @@ function Session({ d, repId }) {
   );
 }
 
-function LastWeek({ d, rep }) {
+function LastWeek({ d, rep, repId }) {
   const f = d.lastFocus, g = f && goalByKey(f.goal), t = d.tiles;
+  // Last week's weekly action reached its target: a gold star on the tile, and a one-time 600ms shimmer.
+  const hit = !!(g && f.actionTarget && f.actionDone >= f.actionTarget);
+  const [celebrate] = useState(() => hit && firstViewOfHit('compass.focusHit.' + repId + '.' + f.goal + '.' + f.setLabel));
   const of = (x) => (x.planned == null ? String(x.done) : x.done + ' of ' + x.planned);
   return (
     <>
@@ -192,7 +204,9 @@ function LastWeek({ d, rep }) {
             <span className="top"><span className="k">LAST WEEK’S FOCUS</span><span className="when">{f.setLabel} · counted from Pulse and orders</span></span>
             <span className="g">{g.name}</span>
             <div className="subs">
-              <span className="sub"><span className="a">WEEKLY ACTION</span><span className="b">{f.actionTarget ? f.actionDone + ' of ' + f.actionTarget : f.actionDone}</span><span className="c">{g.action}</span></span>
+              <span className={'sub' + (hit ? ' is-hit' : '') + (celebrate ? ' celebrate' : '')}>
+                {hit ? <span className="hitstar" role="img" aria-label="Weekly action hit"><Icon name="star5" size={14} /></span> : null}
+                <span className="a">WEEKLY ACTION</span><span className="b">{f.actionTarget ? f.actionDone + ' of ' + f.actionTarget : f.actionDone}</span><span className="c">{g.action}</span></span>
               <span className="sub"><span className="a">RESULT</span><span className="b">{f.result}</span><span className="c">{g.result}{f.resultNote ? ' · ' + f.resultNote : ''}</span></span>
             </div>
           </section>

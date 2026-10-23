@@ -62,6 +62,13 @@
 .where section:nth-child(2) { animation-delay: 60ms; }
 .where section:nth-child(3) { animation-delay: 120ms; }
 
+/* ---------- Celebration: weekly focus hit (600ms, gold, once per focus week on this device) ---------- */
+.focus-hero .sub.celebrate .hitstar { animation: pop var(--motion-celebrate) var(--ease-out); }
+.focus-hero .sub.celebrate::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 216, 107, .55) 50%, transparent 80%);
+  animation: hit-shimmer var(--motion-celebrate) var(--ease-out); }
+@keyframes hit-shimmer { from { opacity: 1; transform: translateX(-100%); } to { opacity: 0; transform: translateX(100%); } }
+
 /* Skeleton: a slow pulse while loading. */
 .skel, .skel-tile { animation: skel-pulse 1.3s var(--ease-in-out) infinite; }
 @keyframes skel-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }

@@ -203,6 +203,9 @@ body { color: var(--navy); }
 .focus-hero .sub .a { font-size: 12px; font-weight: 700; letter-spacing: .4px; opacity: .85; }
 .focus-hero .sub .b { font-size: var(--fs-stat); font-weight: 700; }
 .focus-hero .sub .c { font-size: 13px; opacity: .85; }
+/* Weekly action target hit: a gold star on the tile (gold = wins only). */
+.focus-hero .sub.is-hit { overflow: hidden; }
+.focus-hero .sub .hitstar { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--gold-1), var(--gold-2)); color: var(--gold-ink); display: flex; align-items: center; justify-content: center; }
 /* No focus set: a quiet tint card at its natural height, not the navy hero. */
 .focus-hero.none { background: var(--tint-2); color: var(--navy); box-shadow: var(--ring-1); align-self: start; }
 .focus-hero.none .k { color: var(--text-2); opacity: 1; }
