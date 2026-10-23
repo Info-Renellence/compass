@@ -1,6 +1,10 @@
 # Compass: database proposal (phase 1)
 
-**Status: proposal only. Nothing in Supabase v2 or v1 has been changed.** Written 2026-10-23 for the weekly sales loop
+**Status: APPROVED by the owner 2026-10-23** (the 5 tables, `tasks.one_on_one_id`, `change_logs_source` + `compass`,
+the `settings` row `compass`, and the recommended option for all four choices in section 8). **Not approved, deferred:**
+`events.customer_reward` and dropping `forecast_activities` (neither was part of this migration). The final migration is
+`renellence-edge/db/v2-010-compass.sql` (no approval guard); **not applied yet** to v1 or v2 (dry-run on v1, rolled back).
+The owner runs the applies. Written 2026-10-23 for the weekly sales loop
 (Friday check-in in Edge -> weekly 1-on-1 in Compass -> the week in Pulse -> next week's results; monthly 1-on-1 ->
 Edge forecasts and My Fifty statuses). The owner approves each table and field before anything is run (SOP section 8).
 
@@ -9,8 +13,9 @@ Edge forecasts and My Fifty statuses). The owner approves each table and field b
   triggers; `tasks` has 0 `one_on_one` rows today, `targets` is empty), `renellence-edge/db/v2-00*.sql`,
   `my-fifty/db/001-my-fifty.sql`, `my-fifty/CHANGELOG-v2.md`, Edge's focus code (`api/_edge/view.js` GOALS,
   `writes.js` `focus_set`, `reads.js` home focus) and the handoff (README, NOTE_FOR_YOUSEF, screens 01-18, prototypes).
-- The migration: [`db/compass-001-proposal.sql`](../db/compass-001-proposal.sql). **Not run.** It refuses to run unless
-  `compass.approved = 'yes'` is set. It was dry-run only in an in-memory Postgres with stub tables (no real database).
+- The proposal SQL: [`db/compass-001-proposal.sql`](../db/compass-001-proposal.sql), kept as the record. **Never run it**:
+  the final, approved file is `renellence-edge/db/v2-010-compass.sql` (same structure; it also grants the tables like
+  every v2 table, adds two indexes, table comments, and checks a picked account is the rep's own on write).
 
 ## 1. In one paragraph
 
@@ -215,7 +220,7 @@ outcomes are written by Pulse's server, which checks the rep.
 **n8n:** none needed for phase 3. The meeting notes (purposes, next steps, extra commitments) come from the note taker
 (open question 7). A weekend job for Second look can be a Compass/Edge daily cron (Hobby plan: once a day is enough).
 
-## 8. Options the owner may prefer (one decision each)
+## 8. Options the owner may prefer (one decision each): decided 2026-10-23, option A for all four
 
 1. **Parked until:** A) derived from the latest Park pick + `park_days` *(Recommended: nothing stored twice)* ·
    B) `contacts.parked_until_date` (simpler queries, but a second copy of the same fact).
@@ -259,4 +264,4 @@ outcomes are written by Pulse's server, which checks the rep.
 13. **Sample names.** The handoff uses a real rep's first name (Emily) and Cat; the sample data uses made-up names
     (rep "Tessa", manager "Bea") as the SOP requires. Real names appear only from the real API.
 14. **change_logs volume:** a check-in writes one `account_picks` row per owned account (every lead too), each logged by
-    the trigger. Fine at today's size; say if you'd rather not log `account_picks` inserts.
+    the trigger. Fine at today's size; say if you'd rather not log `account_picks` inserts. **Answered 2026-10-23: log them** (every insert is logged).

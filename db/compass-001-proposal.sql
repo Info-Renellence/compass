@@ -1,5 +1,6 @@
 -- ============================================================================================================
--- Compass: PROPOSED migration for Supabase v2 (ojphplepzuwchjtuycpv).  *** NOT RUN. DO NOT RUN WITHOUT THE OWNER'S YES. ***
+-- Compass: PROPOSED migration for Supabase v2 (ojphplepzuwchjtuycpv).  *** NEVER RUN THIS FILE. ***
+-- Approved 2026-10-23; the final migration is renellence-edge/db/v2-010-compass.sql. This file is kept as the record.
 -- Written 2026-10-23 for docs/compass-data-proposal.md. v2 holds real production data since 2026-10-22.
 -- Follows renellence-edge/docs/data-model-sop.md (sections 2, 3, 7, 8) and the v2-008 naming rules.
 -- When approved: apply the agreed parts only, log every change in my-fifty/CHANGELOG-v2.md, update SOP section 10,
