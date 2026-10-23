@@ -58,8 +58,11 @@ const P = {
   swap: ['M17 2l4 4-4 4', 'M3 11V9a3 3 0 0 1 3-3h15', 'M7 22l-4-4 4-4', 'M21 13v2a3 3 0 0 1-3 3H3'],
 };
 
-export function Icon({ name, size = 17, stroke = 2, className, style, title }) {
+// One stroke width for the whole set: 2, and 2.5 only for small check/chevron glyphs (14px and below), which sit inside
+// filled circles and buttons (UI polish 2026-10-23).
+export function Icon({ name, size = 17, className, style, title }) {
   const parts = P[name] || [];
+  const stroke = size <= 14 && /^(check|chevron)/.test(name) ? 2.5 : 2;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden={title ? undefined : true} role={title ? 'img' : undefined} className={className} style={style}>

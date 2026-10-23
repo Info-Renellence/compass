@@ -1,9 +1,11 @@
 /* Copied from renellence-edge/web/src/styles.css (no-hubspot, 2026-10-23): Edge's design tokens, base rules and the
    shared components Compass uses (buttons, chips, pills, segmented control). Keep in sync with Edge by hand; Compass's
-   own rules live in compass.css. */
+   own rules live in compass.css.
+   UI polish 2026-10-23 (owner approved): the shared token set from the polish review (colour, spacing, radius, shadow,
+   type, motion) is added below. Old names stay as aliases. Edge gets the same set in its own polish pass. */
 :root {
   --navy: #062064; --blue: #1170C0; --blue-2: #1A80D6; --blue-soft: #EAF3FC;
-  --page: #F2F3F7; --card: #FFFFFF; --muted: #5F6878; --faint: #9AA1AD; --faint-2: #8A93A3;
+  --page: #F2F3F7; --card: #FFFFFF; --muted: #5A6373; --faint: #9AA1AD; --faint-2: #5A6373;
   --line: #ECEDF0; --line-2: #E3E6EC; --input: #D5DAE3; --chip: #EEF2F8; --track: #E6EAF0;
   --red: #B42318; --red-soft: #FDE7E7; --red-ring: #F3C9C5;
   --green: #1E7B3C; --green-soft: #E6F4EA; --green-dot: #2E9E5B;
@@ -11,28 +13,67 @@
   --gold-1: #FFD86B; --gold-2: #F5B21F; --gold-ink: #5C3B00;
   --shadow-pop: 0 12px 32px rgba(6, 32, 100, 0.18), 0 0 0 1px #E3E6EC;
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+
+  /* Shared set (polish review). Colour: navy text and active, blue actions, tints, status only with an icon or word,
+     gold only for wins. */
+  --blue-hover: #0E63AC; --blue-press: #0B5596; --navy-hover: #0A2A7A;
+  --tint: #EAF3FC; --tint-2: #F5F9FE; --tint-line: #D6E7F7; --tint-deep: #DCEBFA; --tint-ring: #9CC5EA;
+  --well: #EEF2F8;
+  --text-2: #5A6373;           /* every secondary text, 4.8:1 or better */
+  --decor: #9AA1AD;            /* chevrons and idle dots, never text */
+  --ok: #1E7B3C; --ok-bg: #E6F4EA; --ok-dot: #2E9E5B; --ok-ring: #CDE9D6;
+  --warn: #8A5A00; --warn-bg: #FFF1D6; --warn-dot: #F0A51A; --warn-ring: #F2D9A6;
+  --bad: #B42318; --bad-bg: #FDE7E7; --bad-ring: #F3C9C5;
+  --gold-line: #F6E2A8; --gold-cream: #FFF8E6;
+  --grad-blue: linear-gradient(135deg, #1373C3, #0F63AA);
+  --toast: #062064;
+  /* Spacing (4-point) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px;
+  /* Radius */
+  --r-xs: 6px; --r-sm: 10px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px; --r-hero: 22px; --r-pill: 999px;
+  /* Shadows */
+  --e-1: 0 1px 2px rgba(6, 32, 100, 0.05);
+  --e-seg: 0 1px 2px rgba(6, 32, 100, 0.10);
+  --e-pop: 0 12px 32px rgba(6, 32, 100, 0.18), 0 0 0 1px #E3E6EC;
+  --e-brand: 0 8px 18px rgba(17, 112, 192, 0.25);
+  --ring-1: inset 0 0 0 1px var(--tint-line);
+  --ring-selected: inset 0 0 0 2px var(--blue);
+  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px var(--blue);
+  /* Type (desktop): label 12/700 caps, meta 13, body 14, row title 15/600, h2 18/700, stat 24/700, key number 32/700 */
+  --fs-label: 12px; --fs-meta: 13px; --fs-body: 14px; --fs-row: 15px; --fs-lg: 16px; --fs-h2: 18px; --fs-stat: 24px;
+  --fs-title: 26px; --fs-kpi: 28px; --fs-key: 32px;
+  /* Motion */
+  --motion-fast: 150ms; --motion-standard: 250ms; --motion-celebrate: 600ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-in: cubic-bezier(.4, 0, 1, 1); --ease-in-out: cubic-bezier(.4, 0, .2, 1);
 }
 * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 html, body { margin: 0; background: var(--page); color: var(--navy); font: 14px/1.4 var(--font); }
 a { color: inherit; text-decoration: none; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+/* Focus: the ring follows each element's own radius. Buttons get a white gap and a blue ring so it shows on white,
+   tint, navy and blue alike; links and inputs keep the outline. */
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+button:focus-visible, [role=radio]:focus-visible { outline: none; box-shadow: var(--focus-ring) !important; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.pill { height: 26px; padding: 0 10px; border-radius: 13px; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; white-space: nowrap; flex: none; }
+.pill { height: 24px; padding: 0 10px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; white-space: nowrap; flex: none; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { height: 36px; padding: 0 14px; border-radius: 18px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; border: 1px solid var(--input); background: #fff; color: var(--navy); }
+.chip { height: 36px; padding: 0 14px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; border: 1px solid var(--input); background: #fff; color: var(--navy); }
+.chip:hover { border-color: var(--tint-ring); background: var(--tint-2); }
 .chip.on { border: 0; background: var(--blue); color: #fff; }
-.btn { height: 40px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; border: 1px solid var(--input); background: #fff; color: var(--navy); }
-.btn:hover { border-color: #B9C1CE; }
+.chip.on:hover { background: var(--blue-hover); }
+.btn { height: 40px; padding: 0 16px; border-radius: var(--r-md); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; border: 1px solid var(--input); background: #fff; color: var(--navy); }
+.btn:hover { border-color: var(--tint-ring); background: var(--tint-2); }
+.btn:active { background: var(--tint); }
 .btn.primary { border: 0; background: var(--blue); color: #fff; }
-.btn.primary:hover { background: #0E63AC; }
-.btn.primary:disabled, .btn:disabled { background: var(--line-2); color: var(--faint-2); border: 0; cursor: default; }
-.btn.block { width: 100%; height: 48px; border-radius: 14px; font-size: 16px; font-weight: 700; }
-.btn.done { border: 0; background: var(--green-soft); color: var(--green); }
-.btn.sm { height: 34px; padding: 0 12px; font-size: 13px; }
-.seg { display: inline-flex; background: var(--chip); border-radius: 12px; padding: 4px; gap: 2px; }
-.seg button { border: 0; background: transparent; height: 32px; padding: 0 14px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
-.seg .count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.btn.primary:hover { background: var(--blue-hover); }
+.btn.primary:active { background: var(--blue-press); }
+.btn.primary:disabled, .btn:disabled { background: var(--line-2); color: var(--text-2); border: 0; cursor: default; }
+.btn.block { width: 100%; height: 48px; border-radius: var(--r-md); font-size: 16px; font-weight: 700; }
+.btn.done { border: 0; background: var(--ok-bg); color: var(--ok); }
+.btn.sm { height: 32px; padding: 0 12px; font-size: 13px; }
+.seg { display: inline-flex; background: var(--tint); box-shadow: var(--ring-1); border-radius: var(--r-md); padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; height: 32px; padding: 0 14px; border-radius: var(--r-sm); font-size: 14px; font-weight: 600; color: var(--text-2); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: var(--e-seg); }
+.seg .count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--red); color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
