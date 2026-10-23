@@ -65,7 +65,6 @@ function Session({ d, repId }) {
     data.saveWeekly(repId, plan).then(() => { set({ done: true }); flash('Sent to ' + rep + '’s Pulse'); });
   };
   const back = () => set((x) => ({ step: Math.max(1, x.step - 1) }));
-  const restart = () => setS(fresh(d));
 
   if (s.done) {
     return (
@@ -89,7 +88,6 @@ function Session({ d, repId }) {
           </div>
           <span className="foot-note">Anything else {boss} agrees to is picked up from the meeting notes.</span>
         </section>
-        <button type="button" className="btn" style={{ marginTop: 10 }} onClick={restart}>Start over</button>
       </Done>
     );
   }
@@ -162,7 +160,7 @@ function LastWeek({ d, rep }) {
       <div className="two">
         <section className="cc">
           <CardHead icon="pin" title="Missed visits" right={<span className="cnt">{d.missedVisits.length}</span>} />
-          {d.missedVisits.map((m) => <div key={m.name} className="mrow"><span className="n">{m.name}</span><span className="r">{m.reason}</span></div>)}
+          {d.missedVisits.map((m) => <div key={m.name} className="mrow"><span className="n">{m.name}</span></div>)}
         </section>
         <section className="cc">
           <CardHead icon="doc" title="Forecast changes" right={<span className="cnt green"><Icon name="check" size={13} stroke={2.6} />{d.checkin.submittedLabel}</span>} />

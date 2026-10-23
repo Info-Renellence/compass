@@ -43,7 +43,6 @@ function Session({ d, repId }) {
           <section><span className="k">EDGE · CUSTOMERS</span><span className="t">My Fifty statuses saved</span></section>
           <section><span className="k">WEEKLY 1-ON-1s</span><span className="t">Skill of the month in roleplays</span></section>
         </div>
-        <button type="button" className="btn" style={{ marginTop: 10 }} onClick={() => setS(fresh(d))}>Start over</button>
       </Done>
     );
   }

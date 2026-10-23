@@ -31,7 +31,7 @@ The handoff README says its model is "a starting point, not final". Here is what
 | `weekly_checkin` (rep_id, week_start, submitted_at, help_note) | **`checkins`** | Same fields, SOP names (`week_start_date`, `rep_id`). Plural noun (rule 1) |
 | `account_pick` (checkin_id, account_id, suggested_pick, suggested_reason, rep_pick, final_pick, purpose) | **`account_picks`** + frozen `sort_group` | "Account" is `contacts` (SOP 4: the contact is the account), so `contact_id`. The group is frozen because it changes after Friday (SOP rule 9) |
 | `second_look` (account_pick_id, fact_line, decision) | **2 columns on `account_picks`**: `second_look_fact`, `second_look_decision` | It belongs to one pick and can't stand alone: a column, not a table (SOP 2.3) |
-| `visit_outcome` (account_pick_id, status done/missed, missed_reason) | **2 columns on `account_picks`**: `visit_interaction_id`, `missed_reason` | Done = the Pulse visit that already lands in `interactions`; linking it avoids a stored status (SOP 2.4). Missed needs a reason, which has no other home |
+| `visit_outcome` (account_pick_id, status done/missed, missed_reason) | **2 columns on `account_picks`**: `visit_interaction_id`, `missed_at` | Done = the Pulse visit that already lands in `interactions`; linking it avoids a stored status (SOP 2.4). Missed is just a time: no reason is asked (owner 2026-10-23) |
 | `forecast_change` (forecast_id, change_type, from_value, to_value, reason) | **`forecast_changes`** without from/to values | The old and new due date and amounts are already in `change_logs` (forecasts has the `log_changes` trigger); storing them again would duplicate (SOP 8.2). Only the kind and the reason are new |
 | `weekly_focus` (rep_id, week_start, goal_key, action_target, action_actual, result_actual) | **Edge's existing focus task** + `one_on_ones.focus_action_target_count` | The goal is already a task (owner decision 3, 2026-10-22). Actuals are counted, never stored (SOP 2.4) |
 | `weekly_session` (rep_id, week_start, roleplay_skill, roleplay_character, roleplay_done, cat_commitments[]) | **`one_on_ones`** (`kind` weekly) + commitments as **`tasks`** | One table per real noun, variations by `kind` (SOP 2.2). Commitments are things someone has to do: `tasks` already holds those (SOP 4), assigned to the manager |
@@ -67,9 +67,9 @@ Every table gets `id uuid`, `created_at`, `updated_at` (except the append-style 
 | `second_look_fact` | text | | Set when the pick is queued for Second look; the plain fact line |
 | `second_look_decision` | enum `account_picks_second_look_decision` | | keep · change; empty = not discussed (optional, Next never blocks) |
 | `visit_interaction_id` | uuid | FK `interactions.id` | **Done**: the Pulse visit (`kind meeting`, `mode in_person` or `video`) that closed it |
-| `missed_reason` | enum `account_picks_missed_reason` | | **Missed**: clinic_closed · ran_out_of_time · clinic_rescheduled · contact_unavailable · other |
+| `missed_at` | timestamptz | | **Missed**: when the rep marked it missed in Pulse. No reason is asked (owner 2026-10-23) |
 
-A visit is Done when `visit_interaction_id` is set, Missed when `missed_reason` is set (never both), open otherwise.
+A visit is Done when `visit_interaction_id` is set, Missed when `missed_at` is set (never both), open otherwise.
 
 ### `forecast_changes`: the reason behind each forecast change on Friday
 | Field | Type | Key | Notes |
@@ -135,7 +135,7 @@ targets (kind target, metric revenue)  ·  metric_snapshots (forecast on the 1st
 | Weekly 1 | My Fifty count and change | Derived (an order in the last 3 months), compared with a week ago |
 | Weekly 1 | Forecast landed | Forecasts due last week (`due_date`) that turned into Ordered by their due day |
 | Weekly 1 | Visits / calls done of planned | Last week's `account_picks.final_pick` visit/call vs Pulse `interactions` that week (a video call counts as a visit; a no-show doesn't) |
-| Weekly 1 | Missed visits | `account_picks.missed_reason` from last week's check-in |
+| Weekly 1 | Missed visits | `account_picks.missed_at` from last week's check-in (names only, no reasons) |
 | Weekly 1 | Forecast changes, "Sent Fri 4:12 pm" | `forecast_changes` + `forecasts` (current due date or dropped) + `checkins.submitted_at` |
 | Weekly 2 | Second look | `account_picks` where `second_look_fact` is set; decision -> `second_look_decision` and `final_pick` |
 | Weekly 3, 5 | Visits, calls | `account_picks` (final pick), group pill = `sort_group`, purpose = `purpose` |
@@ -168,8 +168,7 @@ check-in opens on Friday (suggestions) and over the weekend (second look), and t
 - **Focus actuals** (counted from Pulse and orders for the focus week): close = sampled contacts with a visit or call
   whose outcome asked for an order date (`interactions.outcome`, see open question 9) / first paid orders · warm = quiet
   My Fifty contacts visited / reorders · grow = current accounts with a visit mentioning a second line / accounts
-  ordering a new `product_line` · fill = warm leads given samples or onboarding / new candidates · refer = intros asked /
-  new contacts with a referral source · events = invites (`event_attendees.invited_by_id`) / registered (`status rsvp`
+  ordering a new `product_line` · fill = warm leads given samples or onboarding / new candidates · events = invites (`event_attendees.invited_by_id`) / registered (`status rsvp`
   or attended).
 
 ## 6. Access (row-level security, SOP section 7)
@@ -207,8 +206,8 @@ outcomes are written by Pulse's server, which checks the rep.
 - **Today, top:** "This week's focus" (goal name + "<n> <weekly action>") and, until confirmed, a single
   **"Confirm my week"** button showing "N visits · N calls" -> sets `one_on_ones.week_confirmed_at`.
 - **This week's visits:** the agreed visits (`final_pick = visit`) with their purpose. Logging a visit as usual creates
-  the `interactions` row; Pulse links it (`visit_interaction_id`) = **Done**. A **Missed** button asks for the reason
-  (the fixed list) -> `missed_reason`. Every visit ends Done or Missed.
+  the `interactions` row; Pulse links it (`visit_interaction_id`) = **Done**. A **Missed** button marks it missed (no reason asked)
+  -> `missed_at`. Every visit ends Done or Missed.
 - **This week's calls:** the agreed calls with their purpose; logging a call works as today.
 - Parked accounts are hidden from Pulse's suggestions until their date. Nothing about suggestions or changes is shown.
 - Pulse's `book.js` / `lists.js` (shared with Edge) gain the parked filter; keep both copies in sync.
@@ -248,11 +247,10 @@ outcomes are written by Pulse's server, which checks the rep.
    does it deliver them? Proposed: its output lands in `ai_outputs` (kind `next_steps`), which would need a new FK
    `ai_outputs.one_on_one_id` (one more "exactly one link" parent), and is applied to `account_picks.purpose` and
    manager `tasks`.
-8. **Missed-visit reasons:** confirm the fixed list (clinic closed · ran out of time · clinic moved it · contact not
-   available · other) or give your own.
+8. **Missed-visit reasons:** removed by the owner (2026-10-23). A missed visit is only marked missed, with no reason.
 9. **Counting focus actions** like "asked for an order date" or "shown a second line" needs Pulse to capture them.
    Proposed: new `interactions.outcome` values (it is free text today, no structure change), e.g. `asked_order_date`,
-   `showed_second_line`, `asked_referral`. Agree the list.
+   `showed_second_line`. Agree the list. (Referrals removed by the owner, 2026-10-23.)
 10. **Forecast accuracy** needs a snapshot of each rep's forecasts on the 1st (`metric_snapshots`). Edge's old cron
     (`/api/forecast?snapshot=1`, 1st of the month) belongs to the v1 routes; confirm a v2 snapshot job.
 11. **Monthly targets:** `targets` is empty in v2. Who enters each rep's monthly revenue target, and where (Edge admin)?

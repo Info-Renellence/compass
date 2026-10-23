@@ -19,13 +19,12 @@ end $$;
 create type account_picks_pick as enum ('visit', 'call', 'wait', 'park');                 -- suggested_pick, rep_pick, final_pick
 create type account_picks_sort_group as enum ('candidate', 'onboarded', 'fifty', 'lead'); -- frozen at the check-in
 create type account_picks_second_look_decision as enum ('keep', 'change');
-create type account_picks_missed_reason as enum ('clinic_closed', 'ran_out_of_time', 'clinic_rescheduled', 'contact_unavailable', 'other');
 create type forecast_changes_change_kind as enum ('moved', 'dropped', 'pushed_later', 'reduced', 'went_up', 'pulled_forward');
 create type forecast_changes_reason as enum (
   'clinic_timing', 'still_has_stock', 'budget', 'decision_maker_unreachable', 'no_next_step', 'chose_other_brand',
   'estimate_off', 'more_patient_demand', 'new_product_line', 'clinic_pulled_forward');
 create type one_on_ones_kind as enum ('weekly', 'monthly');
-create type one_on_ones_skill as enum ('price_pushback', 'ask_for_order', 'book_next_step', 'ask_referral', 'gatekeeper', 'cold_visit', 'plan_week');
+create type one_on_ones_skill as enum ('price_pushback', 'ask_for_order', 'book_next_step', 'gatekeeper', 'cold_visit', 'plan_week');
 create type one_on_ones_roleplay_character as enum ('skeptic', 'fence_sitter', 'rusher', 'fan', 'gatekeeper', 'newcomer');
 create type fifty_statuses_status as enum ('on_track', 'watch', 'at_risk');
 
@@ -59,11 +58,11 @@ create table account_picks (
   second_look_fact text,                         -- set when the pick is queued for "Second look" (plain fact line)
   second_look_decision account_picks_second_look_decision,
   visit_interaction_id uuid references interactions(id),  -- Done: the Pulse visit that closed it
-  missed_reason account_picks_missed_reason,     -- Missed: why (from Pulse)
+  missed_at timestamptz,                         -- Missed: when the rep marked it missed in Pulse (no reason asked, owner 2026-10-23)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (checkin_id, contact_id),
-  constraint account_picks_done_or_missed check (visit_interaction_id is null or missed_reason is null)
+  constraint account_picks_done_or_missed check (visit_interaction_id is null or missed_at is null)
 );
 
 -- ---------- 4. forecast_changes: the reason for each forecast change made on Friday ---------------------------

@@ -31,7 +31,7 @@ const A = [
   ['zoe', 'Zoe Sample', 'fifty', 'Ordered Oct 8 · lips post in design', 'w', 'Ordered recently. Nothing due.', 'Drop off the lips post', 'v'],
   ['raj', 'Raj Sample', 'fifty', 'Ordered Oct 13', 'w', 'Ordered last week.', '', 'w'],
   ['priya', 'Dr. Priya Sample', 'lead', 'Event lead · Toronto launch Oct 3 · no follow-up', 'c', 'Came to the launch 18 days ago and nobody called.', 'Call to thank her for coming and book a visit', 'p'],
-  ['cal', 'Dr. Cal Sample', 'lead', 'Referral from Dr. Ella · opening a second clinic', 'v', 'A referral is the warmest lead you have.', 'Mention Dr. Ella and send onboarding', 'v'],
+  ['cal', 'Dr. Cal Sample', 'lead', 'Warm · opening a second clinic', 'v', 'Opening a second clinic. Visit while they’re choosing brands.', 'Visit and send onboarding', 'v'],
   ['sara', 'Dr. Sara Sample', 'lead', 'Onboarding · MD signature 6 days', 'c', 'Dr. Lee hasn’t signed in 6 days.', 'Remind Dr. Lee to sign', 'c'],
   ['nina', 'Nina Sample', 'lead', 'Onboarding form sent Oct 17 · not signed', 'c', 'Form unsigned for 4 days.', 'Resend the form and walk her through it', 'c'],
   ['jon', 'Jon Sample', 'lead', 'Event lead · lips webinar Oct 15', 'c', 'Webinar 6 days ago. Call while it’s fresh.', 'Call about the webinar', 'c'],
@@ -58,7 +58,7 @@ function weekly(rep) {
     checkin: { submittedLabel: 'Sent Fri 4:12 pm', helpNote: 'Dr. Noor keeps pushing back on price.' },
     // Pulled from Pulse visit logs, orders and agreements for last week (derived, never stored).
     wins: [
-      { title: 'Dr. Cal Sample signed onboarding', sub: 'Referral from Dr. Ella' },
+      { title: 'Dr. Cal Sample signed onboarding', sub: 'Opening a second clinic' },
       { title: 'Samples placed at 2 clinics', sub: 'Dr. Ria and Mo' },
       { title: 'Raj Sample reordered', sub: '$1,350 · Oct 13' },
     ],
@@ -71,9 +71,9 @@ function weekly(rep) {
       calls: { done: 8, planned: 10 },
     },
     missedVisits: [
-      { name: 'Ana Sample', reason: 'Clinic closed early' },
-      { name: 'Omar Sample', reason: 'Ran out of time' },
-      { name: 'Dr. Ben Sample', reason: 'Clinic moved it to next week' },
+      { name: 'Ana Sample' },
+      { name: 'Omar Sample' },
+      { name: 'Dr. Ben Sample' },
     ],
     forecastChanges: [
       { who: 'Kai', what: 'moved to November', reason: 'Budget or cash flow' },

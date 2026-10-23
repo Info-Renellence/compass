@@ -1,7 +1,8 @@
 // Fixed lists Compass shares with Edge and Pulse. These are the enum values proposed in docs/compass-data-proposal.md;
 // keep the keys in sync with it (and the goal keys with Edge's api/_edge/view.js GOALS, which they reuse).
 
-// The six weekly goals. The keys are Edge's "This week's focus" keys (close, warm, grow, fill, refer, events), saved as a
+// The five weekly goals ("Get referrals" removed, 2026-10-23). The keys are Edge's "This week's focus" keys (close, warm,
+// grow, fill, events), saved as a
 // task with tasks.source = one_on_one and title = the key. Compass adds the weekly action (lead) and the result (lag).
 // [key, name, short definition, weekly action, result, default action target]
 export const GOALS = [
@@ -9,7 +10,6 @@ export const GOALS = [
   ['warm', 'Keep My Fifty warm', 'Reach accounts going quiet.', 'quiet My Fifty accounts visited', 'reorders', 3],
   ['grow', 'Grow current accounts', 'Add a second product line.', 'current accounts shown a second line', 'accounts on a new line', 3],
   ['fill', 'Fill the pipeline', 'Move leads to Candidates.', 'warm leads given samples or onboarding', 'new candidates', 4],
-  ['refer', 'Get referrals', 'Ask happy customers for one intro.', 'happy customers asked for an intro', 'introductions', 4],
   ['events', 'Fill the next event', 'Bring customers to a training.', 'customers invited in person', 'customers registered', 6],
 ].map(([key, name, def, action, result, target]) => ({ key, name, def, action, result, target }));
 export const goalByKey = (k) => GOALS.find((g) => g.key === k) || null;
@@ -19,7 +19,6 @@ export const SKILLS = [
   { key: 'price_pushback', name: 'Handling price pushback', character: 'skeptic' },
   { key: 'ask_for_order', name: 'Asking for the order', character: 'fence_sitter' },
   { key: 'book_next_step', name: 'Booking the next step', character: 'rusher' },
-  { key: 'ask_referral', name: 'Asking for a referral', character: 'fan' },
   { key: 'gatekeeper', name: 'Getting past the gatekeeper', character: 'gatekeeper' },
   { key: 'cold_visit', name: 'Opening a cold visit', character: 'newcomer' },
   { key: 'plan_week', name: 'Planning the week', character: null, monthlyOnly: true },
