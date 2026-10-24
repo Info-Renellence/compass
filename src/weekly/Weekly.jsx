@@ -80,6 +80,8 @@ function Session({ d, repId }) {
   const rep = d.rep.first, boss = d.manager.first;
   const byId = useMemo(() => Object.fromEntries(d.accounts.map((a) => [a.id, a])), [d]);
   useEffect(() => { flash(''); }, [s.step]);   // a toast never outlives its step
+  // Each step and the done screen open at the top (Next sits at the bottom of a long step; run 3, 2026-10-23).
+  useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { /* no window */ } }, [s.step, s.done]);
 
   // Where each account ends up this week: a "Make it a call" from Visits or a "Make it a visit" from Calls, else the
   // second-look decision, else the rep's own Friday pick.

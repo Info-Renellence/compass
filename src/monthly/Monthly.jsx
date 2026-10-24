@@ -31,6 +31,8 @@ function Session({ d, repId }) {
   const total = base + nm.gap.reduce((t, g) => t + (s.added[g.id] ? g.amount : 0), 0);
   const skill = skillByKey(s.skill);
   useEffect(() => { flash(''); }, [s.step]);   // a toast never outlives its step
+  // Each step and the done screen open at the top (Next sits at the bottom of a long step; run 3, 2026-10-23).
+  useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { /* no window */ } }, [s.step, s.done]);
   // Owner 2026-10-23 (UI polish): the monthly banner matches the weekly one; the session line lives in the top bar.
   const sessionText = 'Monthly 1-on-1 · ' + titleCase(m.dateLabel) + ' · ' + m.minutes + ' min';
 
