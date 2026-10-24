@@ -133,7 +133,12 @@ const OPS = {
     const wk = R.weekOf(T.ymd());
     const [s] = await sql`select id from one_on_ones where rep_id = ${rep.id} and kind = 'weekly' and session_date = ${wk.mon} and deleted_at is null`;
     if (!s) throw fail(409, 'save_first');
-    await asUser(me.id, (tx) => syncCommitments(tx, me, rep, s.id, list, wk.end));
+    // Two quick changes (two taps on the chips) take turns, with the same lock as weekly_save, so neither adds a
+    // commitment the other just added (run 3, 2026-10-23).
+    await asUser(me.id, async (tx) => {
+      await tx`select id from users where id = ${rep.id} for update`;
+      return syncCommitments(tx, me, rep, s.id, list, wk.end);
+    });
     return { ok: true, id: s.id };
   },
 
