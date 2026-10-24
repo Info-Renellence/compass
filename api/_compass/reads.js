@@ -214,7 +214,7 @@ const OPS = {
         visits: tile(plannedV, visitedSet, (a) => !!a.visit_interaction_id),
         calls: tile(plannedC, calledSet, () => false),
       },
-      missedVisits: lastPicks.filter((a) => a.missed_at && x.byId[a.contact_id]).map((a) => ({ name: x.byId[a.contact_id].name })),
+      missedVisits: lastPicks.filter((a) => a.missed_at && a.final_pick === 'visit' && x.byId[a.contact_id]).map((a) => ({ name: x.byId[a.contact_id].name })),
       forecastChanges: changes.filter((r) => x.byId[r.contact_id]).map((r) => ({ who: R.firstName(x.byId[r.contact_id]),
         what: KIND[r.change_kind] + (KIND[r.change_kind].endsWith(' ') ? R.monthName(T.ymd(r.due_date).slice(0, 7)) : ''), reason: R.REASONS[r.reason] || r.reason })),
       accounts,

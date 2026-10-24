@@ -123,6 +123,18 @@ test('going cold at exactly 30 days is not yet cold (as Edge and Pulse); at 31 i
   eq([f[d30.id], f[d31.id]], ['on_track', 'at_risk'], 'My Fifty status suggestion');
 });
 
+// Run 3 (2026-10-23): "Missed visits" lists only agreed visits. A visit the rep marked Missed in Pulse that the manager
+// then changed to a call (a re-save the same week) kept its missed mark and was listed as a missed visit.
+test('missed visits: only picks that are still visits', async (sql) => {
+  const { admin, rep, cand, fifty } = await setup(sql);
+  const wk = h.weeks();
+  const [ci] = await sql`insert into checkins (rep_id, week_start_date, submitted_at) values (${rep.id}, ${wk.lastMon}, now()) returning id`;
+  await sql`insert into account_picks (checkin_id, contact_id, sort_group, suggested_pick, suggested_reason, rep_pick, final_pick, missed_at)
+    values (${ci.id}, ${cand.id}, 'candidate', 'visit', 'r', 'visit', 'visit', now()), (${ci.id}, ${fifty.id}, 'fifty', 'visit', 'r', 'visit', 'call', now())`;
+  const w = (await h.get(admin, 'weekly', { rep: rep.id })).data;
+  eq(w.missedVisits.map((m) => m.name), ['Noor Sample'], 'the visit, not the one turned into a call');
+});
+
 // Against Edge's committed files (git HEAD), so work in progress in Edge doesn't fail Compass.
 test('shared rules are exact copies of Edge\'s committed ones (never forked)', async () => {
   const edge = path.join(h.ROOT, '..', 'renellence-edge');
