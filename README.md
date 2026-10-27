@@ -38,8 +38,7 @@ Screenshots of every screen in the handoff's states (for side-by-side checks aga
 
 The person menu (top right) picks which rep the 1-on-1 is with. A third tab, **Second look**, is the manager's own list of
 picks that differed from the suggestion (not part of the meeting). "Find a customer" on every weekly step changes a
-customer's plan for the week. The typed focus is written up by Claude (`api/_compass/ai.js`, model claude-opus-5-5,
-low effort) when **`ANTHROPIC_API_KEY`** is set on the Vercel project; without it the typed words are saved as they are.
+customer's plan for the week. The focus is typed at the end and saved as written (no AI).
 
 ## Deploying on Vercel (owner steps)
 

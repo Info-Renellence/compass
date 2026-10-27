@@ -3,8 +3,7 @@
 // change_logs trigger records who acted and that it was Compass (source 'compass').
 //
 //   weekly_save         the agreed week: final picks, the second-look facts (kept for Cat's list), the roleplay, the typed
-//                       focus (Yousef 2026-10-27: free text, no goal), commitments
-//   focus_draft         the manager's focus notes written up by Claude as one focus line (api/_compass/ai.js); saves nothing
+//                       focus (Yousef 2026-10-27: free text, no goal, no AI), commitments
 //   weekly_commitments  the manager's commitments, changed on the done screen after the save
 //   monthly_save        the month's skill, forecasts added to close the gap, My Fifty statuses, the committed forecast
 const { asUser, db } = require('./db');
@@ -41,14 +40,6 @@ async function syncCommitments(tx, me, rep, sessionId, list, dueAt) {
 }
 
 const OPS = {
-  // The focus notes written up as one line (nothing is saved; the manager edits the line, then Save the week saves it).
-  async focus_draft(me, b) {
-    const rep = await Q.repFor(db(), b.repId);
-    const notes = clean(b.notes, 2000);
-    if (!notes) throw fail(400, 'bad_focus');
-    return require('./ai').focusLine(notes, rep.first);
-  },
-
   async weekly_save(me, b) {
     const sql = db();
     const rep = await Q.repFor(sql, b.repId);
@@ -65,8 +56,7 @@ const OPS = {
       if (!isUuid(o.id) || !(o.decision == null || ['keep', 'change'].includes(o.decision))) throw fail(400, 'bad_decision');
       looks.set(o.id, o.decision || null);
     }
-    // This week's focus (Yousef 2026-10-27): typed, no goal or action target. The line (written up or typed) becomes the
-    // focus task's title, the manager's own notes its body.
+    // This week's focus (Yousef 2026-10-27): typed, no goal or action target, saved as written as the focus task's title.
     const focus = asObject(plan.focus);
     const focusText = clean(focus.text, 200), focusNotes = clean(focus.notes, 2000) || null;
     if (!focusText) throw fail(400, 'bad_focus');

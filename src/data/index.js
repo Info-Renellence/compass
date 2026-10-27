@@ -9,11 +9,10 @@
 //   weekly(repId)             -> the weekly 1-on-1 for the rep's current week (see sample.js for the shape)
 //   monthly(repId)            -> the monthly 1-on-1 for the month that starts this week
 //   saveWeekly(repId, plan)   -> { ok }   plan: { picks: [{ id, finalPick }], secondLook: [{ id, decision }],
-//                                          focus: { text, notes }, roleplay: { skill, character, done },
+//                                          focus: { text }, roleplay: { skill, character, done },
 //                                          commitments: [text] }
 //   saveCommitments(repId, commitments) -> { ok }   the manager's commitments, changed on the done screen
 //   saveMonthly(repId, plan)  -> { ok }   plan: { addedForecasts: [id], fiftyStatus: [{ id, status }], skill }
-//   focusDraft(repId, notes)  -> { line } or { line: null, reason }   the manager's focus notes written up (saves nothing)
 //   secondLookList(repId)     -> { rep, weeks, rows }   Cat's list: picks that differed from the suggestion, and what happened
 // API only: config() -> { googleClientId }, signIn(credential) -> { token, me }, signOut().
 import { sample } from './sample.js';
@@ -56,7 +55,6 @@ const api = {
   saveWeekly(repId, plan) { return this.call('weekly_save', { repId, plan }); },
   saveCommitments(repId, commitments) { return this.call('weekly_commitments', { repId, commitments }); },
   saveMonthly(repId, plan) { return this.call('monthly_save', { repId, plan }); },
-  focusDraft(repId, notes) { return this.call('focus_draft', { repId, notes }); },
   secondLookList(repId) { return this.call('second_look_list&rep=' + encodeURIComponent(repId)); },
 };
 

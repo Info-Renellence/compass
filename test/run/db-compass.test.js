@@ -93,29 +93,6 @@ test('weekly_save: check-in, picks, session, typed focus task (latest wins), com
   eq((await h.post(admin, 'weekly_save', { repId: rep.id, plan: Object.assign(plan('x'), { focus: { text: '   ' } }) })).data.error, 'bad_focus');
 });
 
-test('focus_draft: without ANTHROPIC_API_KEY it answers line null (not_set_up); with a client it returns the line; a refusal falls back', async (sql) => {
-  const { admin, rep } = await setup(sql);
-  const AI = require('../../api/_compass/ai');
-  const key = process.env.ANTHROPIC_API_KEY;
-  try {
-    delete process.env.ANTHROPIC_API_KEY;
-    const off = await h.post(admin, 'focus_draft', { repId: rep.id, notes: 'close noor and ken' });
-    eq([off.status, off.data.line, off.data.reason], [200, null, 'not_set_up'], 'not set up');
-    eq((await h.post(admin, 'focus_draft', { repId: rep.id, notes: '  ' })).data.error, 'bad_focus', 'empty notes');
-    process.env.ANTHROPIC_API_KEY = 'test-key';
-    let sent = null;
-    AI._setClient({ beta: { messages: { create: async (p) => { sent = p; return { stop_reason: 'end_turn', content: [{ type: 'text', text: '"Get Noor and Ken to a first order this week."' }] }; } } } });
-    const on = await h.post(admin, 'focus_draft', { repId: rep.id, notes: 'close noor and ken' });
-    eq(on.data.line, 'Get Noor and Ken to a first order this week.', 'the line, quotes stripped');
-    ok(sent && sent.model === AI.MODEL && sent.fallbacks === 'default' && /close noor and ken/.test(sent.messages[0].content), 'request shape');
-    AI._setClient({ beta: { messages: { create: async () => ({ stop_reason: 'refusal', content: [] }) } } });
-    eq((await h.post(admin, 'focus_draft', { repId: rep.id, notes: 'x' })).data.reason, 'declined', 'a refusal keeps the typed words');
-  } finally {
-    AI._setClient(null);
-    if (key == null) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = key;
-  }
-});
-
 test('second_look_list: picks that differed from the suggestion in sent check-ins, with ordered-since', async (sql) => {
   const { admin, rep, cand } = await setup(sql);
   const w = (await h.get(admin, 'weekly', { rep: rep.id })).data;

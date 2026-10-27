@@ -25,9 +25,8 @@ try {
   await page.waitForTimeout(200); await shot('3-find');
   await page.keyboard.press('Escape');
   for (let i = 0; i < 4; i++) { await page.getByRole('button', { name: 'Next', exact: true }).click(); await page.waitForTimeout(150); }
-  await page.getByLabel('This week’s focus, in your words').fill('get noor and ken to a first order and book two visits with clinics going quiet');
-  await page.getByRole('button', { name: 'Write it up' }).click();
-  await page.getByLabel('Focus line').waitFor();
+  await page.getByLabel('This week’s focus').fill('Get Noor and Ken to a first order and book two visits with clinics going quiet');
+  await page.waitForTimeout(500);
   await shot('4-focus');
   await page.goto('http://127.0.0.1:' + PORT + '/#/second-look');
   await page.getByText(/picks that differed/).waitFor({ timeout: 30000 });

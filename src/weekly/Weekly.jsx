@@ -6,7 +6,7 @@
 //   the suggestion go on Cat's separate list (SecondLook.jsx, the "Second look" tab).
 // - No weekly visit cap on screen ("out of 15" removed).
 // - "Find a customer" on every step: look anyone up and change this week's plan for them (Visit / Call / Wait / Park).
-// - The focus is typed at the end and written up by Claude (api/_compass/ai.js); it shows on Edge Home and in Pulse.
+// - The focus is typed at the end, saved as written (no AI write-up, owner 2026-10-27); it shows on Edge Home and in Pulse.
 // No "flagged", no counts of changed suggestions.
 import { useEffect, useState } from 'react';
 import { data, words } from '../data/index.js';
@@ -48,7 +48,7 @@ function fresh(d) {
   return {
     step: 1, reached: 1, done: false,
     removed, toVisit, toCall, override,
-    focusNotes: sv.focusNotes || '', focusLine: sv.focusText || '',
+    focusText: sv.focusText || '',
     skill: skill.key, character: sv.character || skill.character || 'skeptic', practiced: !!sv.practiced, curve: false, swapped: false,
     commit: Object.fromEntries(d.commitments.map((c) => [c.key, !!c.on])),
   };
@@ -90,7 +90,7 @@ function Session({ d, repId }) {
   };
   // Moving a card from Visits or Calls (or removing it) wins over an earlier Find-a-customer pick.
   const unpick = (x, id) => Object.assign({}, x.override, { [id]: null });
-  const focusText = (s.focusLine.trim() || s.focusNotes.trim()).slice(0, 200);
+  const focusText = s.focusText.trim().slice(0, 200);
   const live = d.accounts.filter((a) => !s.removed[a.id]).sort((x, y) => GROUP_ORDER[x.group] - GROUP_ORDER[y.group]);
   const visits = live.filter((a) => finalPick(a) === 'visit');
   const calls = live.filter((a) => finalPick(a) === 'call');
@@ -104,7 +104,7 @@ function Session({ d, repId }) {
       picks: d.accounts.map((a) => ({ id: a.id, finalPick: finalPick(a) })),
       // Not discussed in the meeting any more; sent without a decision so the facts are kept for Cat's list.
       secondLook: d.secondLook.map((x) => ({ id: x.id, decision: null })),
-      focus: { text: focusText, notes: s.focusNotes.trim() },
+      focus: { text: focusText },
       roleplay: { skill: s.skill, character: s.character, done: s.practiced },
       commitments: d.commitments.filter((c) => s.commit[c.key]).map((c) => c.text),
     };
@@ -170,7 +170,7 @@ function Session({ d, repId }) {
         onVisit={(a) => {
           set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }), toCall: Object.assign({}, x.toCall, { [a.id]: false }), override: unpick(x, a.id) })); flash(a.name + ' moved to visits');
         }} /> : null}
-      {s.step === 6 ? <Focus s={s} set={set} rep={rep} repId={repId} flash={flash} /> : null}
+      {s.step === 6 ? <Focus s={s} set={set} rep={rep} /> : null}
       <Foot onBack={s.step > 1 ? back : null} onNext={next} nextLabel={s.step === 6 ? 'Save the week' : 'Next'} blocked={!okStep[s.step - 1]}
         hint={s.step === 6 ? 'Type a focus to save' : null} />
     </>
@@ -405,39 +405,16 @@ function Calls({ calls, onRemove, onVisit }) {
   );
 }
 
-// Step 6: this week's focus, typed at the end of the meeting (Yousef 2026-10-27; no goal list). "Write it up" asks Claude
-// for one short focus line from the notes; the line can be edited, and it is what Edge Home and Pulse show. Without the
-// write-up (not set up, or not pressed) the notes themselves are saved as the focus.
-function Focus({ s, set, rep, repId, flash }) {
-  const [busy, setBusy] = useState(false);
-  const draft = () => {
-    const notes = s.focusNotes.trim();
-    if (!notes || busy) return;
-    setBusy(true);
-    data.focusDraft(repId, notes).then((r) => {
-      setBusy(false);
-      if (r && r.line) set({ focusLine: r.line });
-      else { set({ focusLine: notes.slice(0, 200) }); flash('Couldn’t write it up right now; your words are used as typed', 'warn'); }
-    }, (e) => { setBusy(false); flash(words(e), 'error'); });
-  };
+// Step 6: this week's focus, typed at the end of the meeting and saved as written (Yousef 2026-10-27: no goal list, no AI
+// write-up). It is what Edge Home and Pulse show for the week.
+function Focus({ s, set, rep }) {
   return (
-    <div className="focus-type">
-      <section className="cc">
-        <CardHead lite icon="note" title={'What will ' + rep + ' focus on this week?'} />
-        <textarea className="focus-notes" value={s.focusNotes} maxLength={2000} placeholder={'Type it the way you agreed it, e.g. "Get Dr. Noor and Ken to a first order, and book two visits with clinics going quiet."'}
-          onChange={(e) => set({ focusNotes: e.target.value })} aria-label="This week’s focus, in your words" />
-        <div className="focus-acts">
-          <button type="button" className="sbtn" disabled={!s.focusNotes.trim() || busy} onClick={draft}><Icon name="sparkle" size={14} />{busy ? 'Writing it up…' : s.focusLine ? 'Write it up again' : 'Write it up'}</button>
-          <span className="foot-note">Turns your notes into one short focus line for {rep}.</span>
-        </div>
-      </section>
-      {s.focusLine ? (
-        <section className="cc focus-line">
-          <span className="k">THIS WEEK’S FOCUS · SHOWN ON EDGE AND PULSE</span>
-          <textarea className="focus-final" value={s.focusLine} maxLength={200} onChange={(e) => set({ focusLine: e.target.value })} aria-label="Focus line" />
-          <span className="foot-note">Edit it if anything is off; this is what {rep} sees.</span>
-        </section>
-      ) : null}
-    </div>
+    <section className="cc focus-type">
+      <CardHead lite icon="note" title={'What will ' + rep + ' focus on this week?'} />
+      <textarea className="focus-final" value={s.focusText} maxLength={200} aria-label="This week’s focus"
+        placeholder={'e.g. Get Dr. Noor and Ken to a first order, and book two visits with clinics going quiet.'}
+        onChange={(e) => set({ focusText: e.target.value })} />
+      <span className="foot-note">Shown on Edge and in Pulse exactly as typed · {200 - s.focusText.length} characters left</span>
+    </section>
   );
 }

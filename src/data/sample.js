@@ -166,8 +166,6 @@ export const sample = {
   saveWeekly: (repId, plan) => { console.info('[sample] weekly 1-on-1 not saved (sample data)', repId, plan); return wait({ ok: true, sample: true }); },
   saveCommitments: (repId, list) => { console.info('[sample] commitments not saved (sample data)', repId, list); return wait({ ok: true, sample: true }); },
   saveMonthly: (repId, plan) => { console.info('[sample] monthly 1-on-1 not saved (sample data)', repId, plan); return wait({ ok: true, sample: true }); },
-  // The focus write-up: on sample data the notes come back tidied (no AI is called).
-  focusDraft: (repId, notes) => wait({ line: String(notes).replace(/\s+/g, ' ').trim().replace(/^./, (c) => c.toUpperCase()).slice(0, 200), sample: true }),
   // Cat's second-look list: picks that differed from the suggestion over the last weeks, and how they turned out.
   secondLookList: (repId) => wait({ rep: { id: repOf(repId).id, first: repOf(repId).first }, weeks: 8, rows: [
     { id: 'noor:1', contactId: 'noor', name: 'Dr. Noor Sample', ini: 'DN', group: 'candidate', week: 'Oct 26', repPick: 'call', suggestedPick: 'visit', why: 'Samples 20 days ago, no order', fact: 'Samples 20 days ago · no order yet', finalPick: 'call', outcome: { ordered: false, text: 'No order since' } },

@@ -13,7 +13,6 @@
     "serve:test": "node --require ./test/run/no-network.js test/run/serve.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
     "google-auth-library": "^9.15.1",
     "postgres": "^3.4.9",
     "react": "^18.3.1",
