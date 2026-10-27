@@ -79,7 +79,9 @@ function LastMonth({ d, rep }) {
   const pct = l.target ? Math.round(l.ordered / l.target * 100) : null;
   const short = (l.target || 0) - l.ordered;
   const max = Math.max(1, ...l.slipped.map((x) => x[1]));
-  const hits = l.focusWeeks.filter((w) => w.done >= w.target).length;
+  // Since 2026-10-27 a weekly focus is typed (text, no goal or count): shown as written, not counted as hit or missed.
+  const counted = l.focusWeeks.filter((w) => w.goal);
+  const hits = counted.filter((w) => w.done >= w.target).length;
   return (
     <>
       <div className="lw-grid">
@@ -103,11 +105,11 @@ function LastMonth({ d, rep }) {
           {l.pattern ? <span className="pattern"><b>Pattern:</b> {l.pattern}</span> : null}
         </section>
         <section className="cc">
-          <CardHead icon="star5" title="Weekly focus this month" right={l.focusWeeks.length ? <span className="right-note">Action hit {hits} of {l.focusWeeks.length} weeks</span> : null} />
+          <CardHead icon="star5" title="Weekly focus this month" right={counted.length ? <span className="right-note">Action hit {hits} of {counted.length} weeks</span> : null} />
           {!l.focusWeeks.length ? <Empty icon="star5" text="No weekly focus was set" /> : null}
           {l.focusWeeks.map((w) => (
-            <div key={w.week} className="wk"><span className="d">{w.week}</span><span className="g">{goalByKey(w.goal).name}</span>
-              <span className={'hit' + (w.done >= w.target ? ' yes' : '')}>{w.done >= w.target ? <Icon name="check" size={12} /> : null}{w.done} of {w.target}</span></div>
+            <div key={w.week} className="wk"><span className="d">{w.week}</span><span className="g">{w.goal ? goalByKey(w.goal).name : w.text}</span>
+              {w.goal ? <span className={'hit' + (w.done >= w.target ? ' yes' : '')}>{w.done >= w.target ? <Icon name="check" size={12} /> : null}{w.done} of {w.target}</span> : null}</div>
           ))}
         </section>
       </div>

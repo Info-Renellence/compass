@@ -302,7 +302,7 @@ async function focusActuals(sql, rep, x, goal, from, to) {
     const [r] = await sql`select count(*) filter (where ea.invited_by_id = ${rep.id} and ea.created_at >= ${fromAt} and ea.created_at <= ${T.atLocal(to, 23, 59)})::int as invited,
         count(*) filter (where ea.status in ('rsvp', 'attended') and ea.updated_at >= ${fromAt} and ea.updated_at <= ${T.atLocal(to, 23, 59)}
                            and (ea.invited_by_id = ${rep.id} or ea.contact_id = any(${ids})))::int as registered
-      from event_attendees ea`;
+      from attendees ea where ea.event_id is not null`;   // event rows only (attendees also holds expense rows since v2-013)
     return { action: r.invited, result: r.registered };
   }
   return { action: 0, result: 0 };

@@ -1,33 +1,28 @@
-// The weekly 1-on-1 (handoff README section 2, screens 08-13): how last week went -> second look -> visits ->
-// roleplay -> calls -> one focus -> done. No typing during the meeting: purposes and next steps come from the
-// meeting notes afterwards. No "AI" wording, no "flagged", no counts of changed suggestions.
-import { useEffect, useMemo, useState } from 'react';
+// The weekly 1-on-1 (handoff README section 2, screens 08-13), reworked by Yousef 2026-10-27 after one-on-one best
+// practice (recognition first, then the numbers, then the plan, then one agreed focus):
+//   wins -> numbers -> visits -> roleplay -> calls -> this week's focus (typed) -> done.
+// - Wins open the meeting on their own step, big, so achievements are the focal point.
+// - The second look is not a step any more (no micromanaging): the rep's own picks stand, and picks that differ from
+//   the suggestion go on Cat's separate list (SecondLook.jsx, the "Second look" tab).
+// - No weekly visit cap on screen ("out of 15" removed).
+// - "Find a customer" on every step: look anyone up and change this week's plan for them (Visit / Call / Wait / Park).
+// - The focus is typed at the end and written up by Claude (api/_compass/ai.js); it shows on Edge Home and in Pulse.
+// No "flagged", no counts of changed suggestions.
+import { useEffect, useState } from 'react';
 import { data, words } from '../data/index.js';
-import { GOALS, goalByKey, SKILLS, CHARACTERS, skillByKey, PICKS } from '../data/catalog.js';
+import { SKILLS, CHARACTERS, skillByKey, PICKS } from '../data/catalog.js';
 import { Icon } from '../icons.jsx';
 import { Banner, CardHead, Foot, Done, Empty, ErrorCard, SessionLine, Skeleton, titleCase, useToast } from '../ui.jsx';
 
-const STEPS = ['Last week', 'Second look', 'Visits', 'Roleplay', 'Calls', 'Focus'];
-const TITLES = ['How last week went', 'Second look', 'Visits this week', 'Quick roleplay', 'Calls this week', 'One focus'];
-// The weekly visit cap: settings.compass.max_visits from the API (session.maxVisits); 15 on sample data.
-let MAX_VISITS = 15;
+const STEPS = ['Wins', 'Numbers', 'Visits', 'Roleplay', 'Calls', 'Focus'];
+const TITLES = ['Last week’s wins', 'How the numbers look', 'Visits this week', 'Quick roleplay', 'Calls this week', 'This week’s focus'];
 const GROUP_ORDER = { candidate: 0, onboarded: 1, fifty: 2, lead: 3 };
 const GROUP_LABEL = { candidate: 'Candidate', onboarded: 'Onboarded', fifty: 'My Fifty', lead: 'Lead' };
 const GROUP_KEYS = ['candidate', 'onboarded', 'fifty', 'lead'];
-const cap = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 // A Friday check-in counts as sent when the API labels it "Sent ..." (else "Draft, not sent" / "No Friday check-in").
 const isSent = (label) => /^Sent\b/.test(label || '');
 // A card that leaves a list (removed, or moved to the other list) plays a 150ms exit first, unless motion is reduced.
 const reduced = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
-// The weekly focus hit (one of the three celebrations): shown once per rep and focus week on this device. Remembered in
-// localStorage (a convenience; if storage is blocked it just shows again) and in memory for this page.
-const seenHits = new Set();
-function firstViewOfHit(key) {
-  if (seenHits.has(key)) return false;
-  seenHits.add(key);
-  try { if (localStorage.getItem(key)) return false; localStorage.setItem(key, '1'); } catch (e) { /* storage blocked */ }
-  return true;
-}
 function useLeaving() {
   const [gone, setGone] = useState({});
   const leave = (a, fn) => {
@@ -41,22 +36,19 @@ function useLeaving() {
 function fresh(d) {
   const month = skillByKey(d.roleplay.monthSkill) || SKILLS[0];
   const sv = d.saved || {};
-  // A week already saved opens as it was agreed: the second-look decisions and the final picks.
-  const decision = {}, removed = {}, toVisit = {}, toCall = {};
-  for (const x of d.secondLook) if (x.decision) decision[x.id] = x.decision;
+  // A week already saved opens as it was agreed: every final pick that differs from the rep's own Friday pick.
+  const removed = {}, toVisit = {}, toCall = {}, override = {};
   for (const a of d.accounts) {
-    if (!a.finalPick) continue;
-    const planned = decision[a.id] === 'change' ? a.suggestedPick : a.repPick;
-    if (a.finalPick === planned) continue;
+    if (!a.finalPick || a.finalPick === a.repPick) continue;
     if (a.finalPick === 'visit') toVisit[a.id] = true;
     else if (a.finalPick === 'call') toCall[a.id] = true;
-    else if (planned === 'visit' || planned === 'call') removed[a.id] = true;
+    else override[a.id] = a.finalPick;
   }
   const skill = skillByKey(sv.skill) || month;
   return {
     step: 1, reached: 1, done: false,
-    decision, removed, toVisit, toCall,
-    goal: sv.goal || null, target: sv.target || 3,
+    removed, toVisit, toCall, override,
+    focusNotes: sv.focusNotes || '', focusLine: sv.focusText || '',
     skill: skill.key, character: sv.character || skill.character || 'skeptic', practiced: !!sv.practiced, curve: false, swapped: false,
     commit: Object.fromEntries(d.commitments.map((c) => [c.key, !!c.on])),
   };
@@ -69,7 +61,6 @@ export default function Weekly({ repId }) {
   useEffect(load, [repId]);
   if (err) return <ErrorCard text={err} onRetry={load} />;
   if (!d) return <Skeleton />;
-  MAX_VISITS = (d.session && d.session.maxVisits) || 15;
   return <Session d={d} repId={repId} />;
 }
 
@@ -78,32 +69,42 @@ function Session({ d, repId }) {
   const [s, setS] = useState(() => fresh(d));
   const set = (patch) => setS((x) => Object.assign({}, x, typeof patch === 'function' ? patch(x) : patch));
   const rep = d.rep.first, boss = d.manager.first;
-  const byId = useMemo(() => Object.fromEntries(d.accounts.map((a) => [a.id, a])), [d]);
+  const [finding, setFinding] = useState(false);
   useEffect(() => { flash(''); }, [s.step]);   // a toast never outlives its step
   // Each step and the done screen open at the top (Next sits at the bottom of a long step; run 3, 2026-10-23).
   useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { /* no window */ } }, [s.step, s.done]);
 
-  // Where each account ends up this week: a "Make it a call" from Visits or a "Make it a visit" from Calls, else the
-  // second-look decision, else the rep's own Friday pick.
+  // Where each account ends up this week: a pick changed in "Find a customer", else a "Make it a call" from Visits or a
+  // "Make it a visit" from Calls, else removed (Wait), else the rep's own Friday pick.
   const finalPick = (a) => {
+    if (s.override[a.id]) return s.override[a.id];
     if (s.toCall[a.id]) return 'call';
     if (s.toVisit[a.id]) return 'visit';
-    return s.decision[a.id] === 'change' ? a.suggestedPick : a.repPick;
+    if (s.removed[a.id]) return 'wait';
+    return a.repPick;
   };
+  const setPick = (a, pick) => {
+    const off = (m) => Object.assign({}, m, { [a.id]: false });
+    set((x) => ({ override: Object.assign({}, x.override, { [a.id]: pick }), removed: off(x.removed), toVisit: off(x.toVisit), toCall: off(x.toCall) }));
+    flash(a.name + ' → ' + PICKS[pick]);
+  };
+  // Moving a card from Visits or Calls (or removing it) wins over an earlier Find-a-customer pick.
+  const unpick = (x, id) => Object.assign({}, x.override, { [id]: null });
+  const focusText = (s.focusLine.trim() || s.focusNotes.trim()).slice(0, 200);
   const live = d.accounts.filter((a) => !s.removed[a.id]).sort((x, y) => GROUP_ORDER[x.group] - GROUP_ORDER[y.group]);
   const visits = live.filter((a) => finalPick(a) === 'visit');
   const calls = live.filter((a) => finalPick(a) === 'call');
-  const goal = goalByKey(s.goal);
-  const okStep = [true, true, visits.length <= MAX_VISITS, true, true, !!goal];
+  const okStep = [true, true, true, true, true, !!focusText];
 
   const goStep = (k) => set((x) => ({ step: k, reached: Math.max(x.reached, k) }));
   const next = () => {
-    if (!okStep[s.step - 1]) { flash(s.step === 3 ? 'Cut visits to ' + MAX_VISITS + ' or fewer' : 'Pick a focus first', 'warn'); return; }
+    if (!okStep[s.step - 1]) { flash('Type this week’s focus first', 'warn'); return; }
     if (s.step < 6) { goStep(s.step + 1); return; }
     const plan = {
-      picks: d.accounts.map((a) => ({ id: a.id, finalPick: s.removed[a.id] ? 'wait' : finalPick(a) })),
-      secondLook: d.secondLook.map((x) => ({ id: x.id, decision: s.decision[x.id] || null })),
-      focus: { goal: goal.key, actionTarget: s.target },
+      picks: d.accounts.map((a) => ({ id: a.id, finalPick: finalPick(a) })),
+      // Not discussed in the meeting any more; sent without a decision so the facts are kept for Cat's list.
+      secondLook: d.secondLook.map((x) => ({ id: x.id, decision: null })),
+      focus: { text: focusText, notes: s.focusNotes.trim() },
       roleplay: { skill: s.skill, character: s.character, done: s.practiced },
       commitments: d.commitments.filter((c) => s.commit[c.key]).map((c) => c.text),
     };
@@ -116,7 +117,7 @@ function Session({ d, repId }) {
     return (
       <>
       <SessionLine text={sessionText} />
-      <Done title={rep + '’s week is set'} line={visits.length + ' visits · ' + calls.length + ' calls · focus: ' + goal.name + ' · ' + s.target + ' ' + goal.action}>
+      <Done title={rep + '’s week is set'} line={visits.length + ' visits · ' + calls.length + ' calls · focus: ' + focusText}>
         <div className="where c2">
           <section><span className="k">PULSE · TODAY</span><span className="t">{rep} confirms the week with one tap. Visits, calls and the focus appear there.</span></section>
           <section><span className="k">EDGE · HOME</span><span className="t">This week’s focus card</span></section>
@@ -152,36 +153,58 @@ function Session({ d, repId }) {
       <SessionLine text={sessionText} />
       <Banner title={TITLES[s.step - 1]} center={<LiveCount visits={visits.length} calls={calls.length} />}
         steps={STEPS} step={s.step} reached={6} onStep={goStep} />
-      {s.step === 1 ? <LastWeek d={d} rep={rep} repId={repId} /> : null}
-      {s.step === 2 ? <SecondLook d={d} byId={byId} rep={rep} decision={s.decision}
-        onDecide={(id, v) => {
-          set((x) => ({ decision: Object.assign({}, x.decision, { [id]: v }) }));
-          if (v === 'change') flash(byId[id].name + ' → ' + PICKS[byId[id].suggestedPick]);
-        }} /> : null}
-      {s.step === 3 ? <Visits visits={visits} onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }}
+      <div className="find-row">
+        <button type="button" className="sbtn find-btn" onClick={() => setFinding(true)}><Icon name="search" size={14} />Find a customer</button>
+      </div>
+      {finding ? <FindCustomer accounts={d.accounts} pickOf={finalPick} onPick={setPick} onClose={() => setFinding(false)} /> : null}
+      {s.step === 1 ? <Wins d={d} rep={rep} /> : null}
+      {s.step === 2 ? <Numbers d={d} rep={rep} /> : null}
+      {s.step === 3 ? <Visits visits={visits} onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }), override: unpick(x, a.id) })); flash('Removed ' + a.name); }}
         onCall={(a) => {
-          set((x) => ({ toCall: Object.assign({}, x.toCall, { [a.id]: true }), toVisit: Object.assign({}, x.toVisit, { [a.id]: false }) }));
+          set((x) => ({ toCall: Object.assign({}, x.toCall, { [a.id]: true }), toVisit: Object.assign({}, x.toVisit, { [a.id]: false }), override: unpick(x, a.id) }));
           flash(a.name + ' moved to calls');
         }} /> : null}
       {s.step === 4 ? <Roleplay s={s} set={set} rep={rep} boss={boss} d={d} flash={flash} /> : null}
-      {s.step === 5 ? <Calls calls={calls} full={visits.length >= MAX_VISITS}
-        onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }) })); flash('Removed ' + a.name); }}
+      {s.step === 5 ? <Calls calls={calls}
+        onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }), override: unpick(x, a.id) })); flash('Removed ' + a.name); }}
         onVisit={(a) => {
-          if (visits.length >= MAX_VISITS) { flash('Visits are full: ' + MAX_VISITS + ' a week', 'warn'); return; }
-          set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }), toCall: Object.assign({}, x.toCall, { [a.id]: false }) })); flash(a.name + ' moved to visits');
+          set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }), toCall: Object.assign({}, x.toCall, { [a.id]: false }), override: unpick(x, a.id) })); flash(a.name + ' moved to visits');
         }} /> : null}
-      {s.step === 6 ? <Focus s={s} set={set} rep={rep} /> : null}
+      {s.step === 6 ? <Focus s={s} set={set} rep={rep} repId={repId} flash={flash} /> : null}
       <Foot onBack={s.step > 1 ? back : null} onNext={next} nextLabel={s.step === 6 ? 'Save the week' : 'Next'} blocked={!okStep[s.step - 1]}
-        hint={s.step === 6 ? 'Pick a focus to save' : null} />
+        hint={s.step === 6 ? 'Type a focus to save' : null} />
     </>
   );
 }
 
-function LastWeek({ d, rep, repId }) {
-  const f = d.lastFocus, g = f && goalByKey(f.goal), t = d.tiles;
-  // Last week's weekly action reached its target: a gold star on the tile, and a one-time 600ms shimmer.
-  const hit = !!(g && f.actionTarget && f.actionDone >= f.actionTarget);
-  const [celebrate] = useState(() => hit && firstViewOfHit('compass.focusHit.' + repId + '.' + f.goal + '.' + f.setLabel));
+// Step 1: last week's wins, on their own and big (Yousef 2026-10-27: achievements are the focal point of the start).
+function Wins({ d, rep }) {
+  return (
+    <section className="wins-hero">
+      <span className="wh-k">{rep.toUpperCase()}’S WINS LAST WEEK</span>
+      {d.wins.length ? (
+        <div className="wh-grid">
+          {d.wins.map((w) => (
+            <div key={w.title} className="wh-card">
+              <span className="wh-star"><Icon name="star5" size={22} /></span>
+              <span className="wh-t">{w.title}</span>
+              <span className="wh-s">{w.sub}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="wh-none">
+          <span className="wh-t">No signed onboardings, samples or orders landed last week.</span>
+          <span className="wh-s">Start with what went well anyway: a good visit, a new contact, a step forward.</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Step 2: the numbers. What the rep wants to talk about first, then the KPIs, missed visits and forecast changes.
+function Numbers({ d, rep }) {
+  const t = d.tiles;
   const of = (x) => (x.planned == null ? String(x.done) : x.done + ' of ' + x.planned);
   return (
     <>
@@ -192,40 +215,11 @@ function LastWeek({ d, rep, repId }) {
           <span className="q">“{d.checkin.helpNote}”</span>
         </span>
       </section> : null}
-      <div className="wins">
-        {d.wins.map((w) => (
-          <span key={w.title} className="win">
-            <span className="st"><Icon name="star5" size={15} /></span>
-            <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}><span className="t">{w.title}</span><span className="s">{w.sub}</span></span>
-          </span>
-        ))}
-      </div>
-      <div className="lw-grid">
-        {g ? (
-          <section className="focus-hero">
-            <span className="top"><span className="k">LAST WEEK’S FOCUS</span><span className="when">{f.setLabel} · counted from Pulse and orders</span></span>
-            <span className="g">{g.name}</span>
-            <div className="subs">
-              <span className={'sub' + (hit ? ' is-hit' : '') + (celebrate ? ' celebrate' : '')}>
-                {hit ? <span className="hitstar" role="img" aria-label="Weekly action hit"><Icon name="star5" size={14} /></span> : null}
-                <span className="a">WEEKLY ACTION</span><span className="b">{f.actionTarget ? f.actionDone + ' of ' + f.actionTarget : f.actionDone}</span><span className="c">{g.action}</span></span>
-              <span className="sub"><span className="a">RESULT</span><span className="b">{f.result}</span><span className="c">{g.result}{f.resultNote ? ' · ' + f.resultNote : ''}</span></span>
-            </div>
-          </section>
-        ) : (
-          <section className="focus-hero none">
-            <span className="top"><span className="k">LAST WEEK’S FOCUS</span></span>
-            <span className="g">No focus was set last week</span>
-          </section>
-        )}
-        <div className="lw-col">
-          <section className="stat"><span className="k">MY FIFTY</span><span className="v">{t.fifty.count}</span><span className="s">{t.fifty.note}</span></section>
-          <section className="stat"><span className="k">FORECAST LANDED</span><span className="v">{t.forecastLanded.landed} of {t.forecastLanded.due}</span><span className="s">Due last week</span></section>
-        </div>
-        <div className="lw-col">
-          <section className="stat"><span className="k">VISITS DONE</span><span className="v">{of(t.visits)}</span><span className="s">{t.visits.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
-          <section className="stat"><span className="k">CALLS DONE</span><span className="v">{of(t.calls)}</span><span className="s">{t.calls.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
-        </div>
+      <div className="kpi-grid">
+        <section className="stat"><span className="k">MY FIFTY</span><span className="v">{t.fifty.count}</span><span className="s">{t.fifty.note}</span></section>
+        <section className="stat"><span className="k">FORECAST LANDED</span><span className="v">{t.forecastLanded.landed} of {t.forecastLanded.due}</span><span className="s">Due last week</span></section>
+        <section className="stat"><span className="k">VISITS DONE</span><span className="v">{of(t.visits)}</span><span className="s">{t.visits.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
+        <section className="stat"><span className="k">CALLS DONE</span><span className="v">{of(t.calls)}</span><span className="s">{t.calls.planned == null ? 'No plan last week' : 'Planned last Monday'}</span></section>
       </div>
       <div className="two">
         <section className="cc">
@@ -248,38 +242,50 @@ function LastWeek({ d, rep, repId }) {
   );
 }
 
-function SecondLook({ d, byId, rep, decision, onDecide }) {
+// "Find a customer" (Yousef 2026-10-27): look anyone on this week's list up and change their plan for the week.
+// Parked accounts are not on the list until their date (the Friday check-in's Park rule).
+function FindCustomer({ accounts, pickOf, onPick, onClose }) {
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const n = q.trim().toLowerCase();
+  const hits = n ? accounts.filter((a) => a.name.toLowerCase().includes(n)).slice(0, 8) : [];
   return (
-    <div className="sl-list">
-      {!d.secondLook.length ? <section className="cc"><Empty icon="check" text="Nothing for a second look this week." /></section> : null}
-      {d.secondLook.map((x) => {
-        const a = byId[x.id], dec = decision[x.id];
-        return (
-          <section key={x.id} className={'sl' + (dec ? ' decided' : '')}>
-            <span className="av46">{a.ini}</span>
-            <span className="mid">
-              <span className="nm"><b>{a.name}</b><span className={'reppill ' + a.repPick}>{rep}: {PICKS[a.repPick]}</span></span>
-              <span className="fact">{x.fact}</span>
-            </span>
-            <span className="acts">
-              <button type="button" className={'slbtn keep' + (dec === 'keep' ? ' on' : '')} aria-pressed={dec === 'keep'} onClick={() => onDecide(x.id, 'keep')}>Keep {PICKS[a.repPick]}</button>
-              <button type="button" className={'slbtn alt' + (dec === 'change' ? ' on' : '')} aria-pressed={dec === 'change'} onClick={() => onDecide(x.id, 'change')}>Make it a {PICKS[a.suggestedPick]}</button>
-            </span>
-          </section>
-        );
-      })}
+    <div className="find-wrap" role="dialog" aria-modal="true" aria-label="Find a customer" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <section className="cc find-card">
+        <CardHead lite icon="search" title="Find a customer" right={<button type="button" className="xbtn" aria-label="Close" onClick={onClose}><Icon name="x" size={14} /></button>} />
+        <input className="find-input" autoFocus placeholder="Type a name" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Customer name" />
+        {n && !hits.length ? <Empty icon="search" text="Nobody on this week’s list matches. Parked accounts come back on their date." /> : null}
+        {hits.map((a) => {
+          const cur = pickOf(a);
+          return (
+            <div key={a.id} className="find-item">
+              <span className="ava">{a.ini}</span>
+              <span className="tx"><b>{a.name}</b><span>{a.fact}</span></span>
+              <span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span>
+              <div className="find-seg" role="radiogroup" aria-label={'This week for ' + a.name}>
+                {Object.keys(PICKS).map((k) => (
+                  <button key={k} type="button" role="radio" aria-checked={cur === k} className={cur === k ? 'on ' + k : ''} onClick={() => onPick(a, k)}>{PICKS[k]}</button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </section>
     </div>
   );
 }
 
-// Live count of the week: visits against the 15 cap, and calls. Bumps when a number changes.
+// Live count of the week: visits and calls (no cap shown since 2026-10-27). Bumps when a number changes.
 function LiveCount({ visits, calls }) {
-  const over = visits > MAX_VISITS;
   return (
-    <div className="livecount" role="status" aria-live="polite" aria-label={visits + ' of ' + MAX_VISITS + ' visits, ' + calls + ' calls'}>
-      <span className={'lc' + (over ? ' over' : '')}>
+    <div className="livecount" role="status" aria-live="polite" aria-label={visits + ' visits, ' + calls + ' calls'}>
+      <span className="lc">
         <span className="ic"><Icon name="pin" size={16} /></span>
-        <span className="nums"><b key={'v' + visits} className="bump">{visits}</b><i>/ {MAX_VISITS}</i></span>
+        <span className="nums"><b key={'v' + visits} className="bump">{visits}</b></span>
         <span className="lbl">VISITS</span>
       </span>
       <span className="div" aria-hidden="true" />
@@ -293,16 +299,12 @@ function LiveCount({ visits, calls }) {
 }
 
 function Visits({ visits, onRemove, onCall }) {
-  const over = visits.length > MAX_VISITS;
   const [gone, leave] = useLeaving();
   return (
     <section className="cc">
-      <CardHead lite icon="pin" title="Visits this week" right={<span className={'right-strong' + (over ? ' over' : '')}>{over ? <Icon name="alert" size={14} /> : null}{visits.length} of {MAX_VISITS}</span>} />
-      {/* Owner 2026-10-23: no purpose notes on this step; the space goes to a capacity bar, a mix by group and a card grid. */}
+      <CardHead lite icon="pin" title="Visits this week" right={<span className="right-strong">{visits.length} {visits.length === 1 ? 'visit' : 'visits'}</span>} />
+      {/* Owner 2026-10-23: no purpose notes on this step; a mix by group and a card grid (no capacity bar since 2026-10-27). */}
       <div className="vsum">
-        <div className="vcap" aria-label={visits.length + ' of ' + MAX_VISITS + ' visits'}>
-          {Array.from({ length: MAX_VISITS }, (_, i) => <span key={i} className={'seg' + (i < visits.length ? (over ? ' on over' : ' on') : '')} />)}
-        </div>
         <div className="vmix">
           {GROUP_KEYS.map((g) => {
             const n = visits.filter((a) => a.group === g).length;
@@ -382,7 +384,7 @@ function Roleplay({ s, set, rep, boss, d, flash }) {
   );
 }
 
-function Calls({ calls, full, onRemove, onVisit }) {
+function Calls({ calls, onRemove, onVisit }) {
   const [gone, leave] = useLeaving();
   return (
     <section className="cc">
@@ -393,7 +395,7 @@ function Calls({ calls, full, onRemove, onVisit }) {
           <div key={a.id} className={'callc' + (gone[a.id] ? ' leaving' : '')}>
             <span className="ava">{a.ini}</span>
             <span className="tx"><b>{a.name}</b><span>{a.purpose || a.suggestedReason}</span></span>
-            <button type="button" className="minibtn tovisit" onClick={() => (full ? onVisit(a) : leave(a, onVisit))}><Icon name="pin" size={14} />Make it a visit</button>
+            <button type="button" className="minibtn tovisit" onClick={() => leave(a, onVisit)}><Icon name="pin" size={14} />Make it a visit</button>
             <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => leave(a, onRemove)}><Icon name="x" size={14} /></button>
           </div>
         ))}
@@ -403,34 +405,39 @@ function Calls({ calls, full, onRemove, onVisit }) {
   );
 }
 
-function Focus({ s, set, rep }) {
-  const g = goalByKey(s.goal);
+// Step 6: this week's focus, typed at the end of the meeting (Yousef 2026-10-27; no goal list). "Write it up" asks Claude
+// for one short focus line from the notes; the line can be edited, and it is what Edge Home and Pulse show. Without the
+// write-up (not set up, or not pressed) the notes themselves are saved as the focus.
+function Focus({ s, set, rep, repId, flash }) {
+  const [busy, setBusy] = useState(false);
+  const draft = () => {
+    const notes = s.focusNotes.trim();
+    if (!notes || busy) return;
+    setBusy(true);
+    data.focusDraft(repId, notes).then((r) => {
+      setBusy(false);
+      if (r && r.line) set({ focusLine: r.line });
+      else { set({ focusLine: notes.slice(0, 200) }); flash('Couldn’t write it up right now; your words are used as typed', 'warn'); }
+    }, (e) => { setBusy(false); flash(words(e), 'error'); });
+  };
   return (
-    <>
-      <div className="goals" role="radiogroup" aria-label="This week’s focus">
-        {GOALS.map((x) => (
-          <button key={x.key} type="button" role="radio" aria-checked={s.goal === x.key} className={'goal' + (s.goal === x.key ? ' on' : '')}
-            onClick={() => set({ goal: x.key, target: x.target })}>
-            <span className="top"><span className="nm">{x.name}</span>{s.goal === x.key ? <span className="tick"><Icon name="check" size={12} /></span> : null}</span>
-            <span className="df">{x.def}</span>
-            <span className="rs">Result: {x.result}</span>
-          </button>
-        ))}
-      </div>
-      {g ? (
-        <div className="lead-lag">
-          <span className="l">
-            <span className="k">WEEKLY ACTION · WHAT {rep.toUpperCase()} CONTROLS</span>
-            <span className="stepr">
-              <button type="button" className="circ" aria-label="Less" onClick={() => set((x) => ({ target: Math.max(1, x.target - 1) }))}><Icon name="minus" size={16} /></button>
-              <span key={s.target} className="num bump" aria-live="polite">{s.target}</span>
-              <button type="button" className="circ plus" aria-label="More" onClick={() => set((x) => ({ target: Math.min(15, x.target + 1) }))}><Icon name="plus" size={16} /></button>
-              <span className="act">{g.action}</span>
-            </span>
-          </span>
-          <span className="r"><span className="k">RESULT WE TRACK</span><span className="v">{cap(g.result)}</span><span className="s">Counted from Pulse and orders</span></span>
+    <div className="focus-type">
+      <section className="cc">
+        <CardHead lite icon="note" title={'What will ' + rep + ' focus on this week?'} />
+        <textarea className="focus-notes" value={s.focusNotes} maxLength={2000} placeholder={'Type it the way you agreed it, e.g. "Get Dr. Noor and Ken to a first order, and book two visits with clinics going quiet."'}
+          onChange={(e) => set({ focusNotes: e.target.value })} aria-label="This week’s focus, in your words" />
+        <div className="focus-acts">
+          <button type="button" className="sbtn" disabled={!s.focusNotes.trim() || busy} onClick={draft}><Icon name="sparkle" size={14} />{busy ? 'Writing it up…' : s.focusLine ? 'Write it up again' : 'Write it up'}</button>
+          <span className="foot-note">Turns your notes into one short focus line for {rep}.</span>
         </div>
+      </section>
+      {s.focusLine ? (
+        <section className="cc focus-line">
+          <span className="k">THIS WEEK’S FOCUS · SHOWN ON EDGE AND PULSE</span>
+          <textarea className="focus-final" value={s.focusLine} maxLength={200} onChange={(e) => set({ focusLine: e.target.value })} aria-label="Focus line" />
+          <span className="foot-note">Edit it if anything is off; this is what {rep} sees.</span>
+        </section>
       ) : null}
-    </>
+    </div>
   );
 }

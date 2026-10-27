@@ -25,19 +25,21 @@ function sentLabel(at) {
   return 'Sent ' + day.replace('.', '') + ' ' + time;
 }
 
-// The latest focus goal of a week (Edge's rule: one per week, the latest wins), with its session's action target.
+// The latest focus of a week (Edge's rule: one per week, the latest wins): a goal key (set on Edge Home), or since
+// 2026-10-27 a typed focus from a weekly 1-on-1 (title = the focus line, body = the manager's notes; goal null).
 async function focusOf(sql, repId, wk) {
-  const [t] = await sql`select t.id, t.title, t.created_at, t.one_on_one_id, o.focus_action_target_count as target from tasks t
+  const [t] = await sql`select t.id, t.title, t.body, t.created_at, t.one_on_one_id, o.focus_action_target_count as target from tasks t
       left join one_on_ones o on o.id = t.one_on_one_id and o.deleted_at is null
-    where t.assignee_id = ${repId} and t.source = 'one_on_one' and t.deleted_at is null and t.title = any(${R.GOALS})
+    where t.assignee_id = ${repId} and t.source = 'one_on_one' and t.deleted_at is null and (t.title = any(${R.GOALS}) or t.one_on_one_id is not null)
       and t.due_at >= ${wk.start} and t.due_at <= ${wk.end} order by t.created_at desc limit 1`;
   if (!t) return null;
+  if (!R.GOALS.includes(t.title)) return { id: t.id, goal: null, text: t.title, notes: t.body || '', setAt: t.created_at, target: null, oneOnOneId: t.one_on_one_id };
   let target = t.target;
   if (target == null) {
     const [o] = await sql`select focus_action_target_count as n from one_on_ones where rep_id = ${repId} and kind = 'weekly' and session_date = ${wk.mon} and deleted_at is null`;
     target = o ? o.n : null;
   }
-  return { id: t.id, goal: t.title, setAt: t.created_at, target, oneOnOneId: t.one_on_one_id };
+  return { id: t.id, goal: t.title, text: null, notes: '', setAt: t.created_at, target, oneOnOneId: t.one_on_one_id };
 }
 
 async function session(sql, repId, kind, day) {
@@ -94,7 +96,7 @@ async function gapRows(sql, x, monthKey) {
   const from = R.monthStart(monthKey), to = R.monthEnd(monthKey);
   const has = new Set(x.fcs.filter((f) => T.ymd(f.due_date).slice(0, 7) === monthKey).map((f) => f.contact_id));
   const ids = x.people.map((p) => p.id);
-  const evRows = ids.length ? await sql`select ea.contact_id, e.name, e.starts_at from event_attendees ea join events e on e.id = ea.event_id
+  const evRows = ids.length ? await sql`select ea.contact_id, e.name, e.starts_at from attendees ea join events e on e.id = ea.event_id
     where ea.contact_id = any(${ids}) and ea.status = 'rsvp' and e.deleted_at is null and e.starts_at >= ${T.atLocal(from, 0, 0)} and e.starts_at <= ${T.atLocal(to, 23, 59)}` : [];
   const evBy = Object.fromEntries(evRows.map((r) => [r.contact_id, r]));
   const today = x.today;
@@ -179,7 +181,8 @@ const OPS = {
 
     // Last week: focus, tiles, missed visits.
     let lf = null;
-    if (lastFocus) {
+    if (lastFocus && !lastFocus.goal) lf = { goal: null, text: lastFocus.text, setLabel: 'Set ' + R.short(lastFocus.setAt) };
+    else if (lastFocus) {
       const n = await R.focusActuals(sql, rep, x, lastFocus.goal, lw.mon, lw.sun);
       lf = { goal: lastFocus.goal, setLabel: 'Set ' + R.short(lastFocus.setAt), actionDone: n.action, actionTarget: lastFocus.target, result: n.result, resultNote: '' };
     }
@@ -223,8 +226,37 @@ const OPS = {
       commitments: commitments(saved, skill, rep, accounts, x),
       // What this session already saved, so reopening it shows the agreed week.
       saved: sess ? { goal: focusNow && focusNow.oneOnOneId === sess.id ? focusNow.goal : null, target: sess.focus_action_target_count, skill: sess.skill,
+        focusText: focusNow && focusNow.oneOnOneId === sess.id ? focusNow.text : null, focusNotes: focusNow && focusNow.oneOnOneId === sess.id ? focusNow.notes : '',
         character: sess.roleplay_character, practiced: !!sess.roleplay_done_at } : null,
     };
+  },
+
+  // Cat's second-look list (Yousef 2026-10-27): the second look is no longer a step of the weekly 1-on-1 (no
+  // micromanaging), but every account where the rep's Friday pick differed from the suggestion is tracked here, for the
+  // last 8 weeks, with what happened since: ordered (the SOP's Ordered) or not. Read only; nothing is decided here.
+  async second_look_list(sql, me, q) {
+    const rep = await repFor(sql, q.get('rep'));
+    const x = await R.load(sql, rep);
+    const wk = R.weekOf(x.today);
+    const from = T.addDays(wk.mon, -7 * 7);
+    const rows = await sql`select c.week_start_date, c.submitted_at, ap.contact_id, ap.sort_group, ap.suggested_pick, ap.suggested_reason, ap.rep_pick,
+        ap.final_pick, ap.second_look_fact
+      from account_picks ap join checkins c on c.id = ap.checkin_id
+      where c.rep_id = ${rep.id} and c.week_start_date >= ${from} and c.submitted_at is not null
+        and ap.rep_pick is not null and ap.suggested_pick is not null and ap.rep_pick <> ap.suggested_pick
+      order by c.week_start_date desc`;
+    const out = [];
+    for (const r of rows) {
+      const p = x.byId[r.contact_id];
+      if (!p) continue;
+      const mon = T.ymd(r.week_start_date);
+      const after = p.orders.filter((o) => B.isOrder(o) && T.ymd(B.placedAt(o)) >= mon).sort((a, b) => (B.placedAt(a) > B.placedAt(b) ? 1 : -1))[0];
+      out.push({ id: r.contact_id + ':' + mon, contactId: p.id, name: p.name, ini: R.initials(p.name), group: r.sort_group, week: R.short(mon + 'T12:00:00Z'),
+        repPick: r.rep_pick, suggestedPick: r.suggested_pick, why: r.suggested_reason || '', fact: r.second_look_fact || R.fact(p, x),
+        finalPick: r.final_pick || r.rep_pick,
+        outcome: after ? { ordered: true, text: 'Ordered ' + R.short(B.placedAt(after)) + ' · ' + R.money(after.total) } : { ordered: false, text: 'No order since' } });
+    }
+    return { rep: { id: rep.id, first: rep.first }, weeks: 8, rows: out };
   },
 
   // The monthly 1-on-1 for the month this week plans (rules.plannedMonth).
@@ -252,6 +284,7 @@ const OPS = {
     for (const mon of weeks) {
       const f = await focusOf(sql, rep.id, R.weekOf(mon));
       if (!f) continue;
+      if (!f.goal) { focusWeeks.push({ week: R.short(mon + 'T12:00:00Z'), goal: null, text: f.text, done: null, target: null }); continue; }
       const n = await R.focusActuals(sql, rep, x, f.goal, mon, T.addDays(mon, 6));
       focusWeeks.push({ week: R.short(mon + 'T12:00:00Z'), goal: f.goal, done: n.action, target: f.target || 0 });
     }

@@ -2,7 +2,9 @@
 // rep, touches only that rep's own accounts (contacts.owner_id), and runs in one transaction through asUser(), so the
 // change_logs trigger records who acted and that it was Compass (source 'compass').
 //
-//   weekly_save         the agreed week: final picks, second-look decisions, the roleplay, the focus goal, commitments
+//   weekly_save         the agreed week: final picks, the second-look facts (kept for Cat's list), the roleplay, the typed
+//                       focus (Yousef 2026-10-27: free text, no goal), commitments
+//   focus_draft         the manager's focus notes written up by Claude as one focus line (api/_compass/ai.js); saves nothing
 //   weekly_commitments  the manager's commitments, changed on the done screen after the save
 //   monthly_save        the month's skill, forecasts added to close the gap, My Fifty statuses, the committed forecast
 const { asUser, db } = require('./db');
@@ -39,6 +41,14 @@ async function syncCommitments(tx, me, rep, sessionId, list, dueAt) {
 }
 
 const OPS = {
+  // The focus notes written up as one line (nothing is saved; the manager edits the line, then Save the week saves it).
+  async focus_draft(me, b) {
+    const rep = await Q.repFor(db(), b.repId);
+    const notes = clean(b.notes, 2000);
+    if (!notes) throw fail(400, 'bad_focus');
+    return require('./ai').focusLine(notes, rep.first);
+  },
+
   async weekly_save(me, b) {
     const sql = db();
     const rep = await Q.repFor(sql, b.repId);
@@ -55,10 +65,11 @@ const OPS = {
       if (!isUuid(o.id) || !(o.decision == null || ['keep', 'change'].includes(o.decision))) throw fail(400, 'bad_decision');
       looks.set(o.id, o.decision || null);
     }
+    // This week's focus (Yousef 2026-10-27): typed, no goal or action target. The line (written up or typed) becomes the
+    // focus task's title, the manager's own notes its body.
     const focus = asObject(plan.focus);
-    if (!R.GOALS.includes(focus.goal)) throw fail(400, 'bad_goal');
-    const target = Number(focus.actionTarget);
-    if (!Number.isInteger(target) || target < 1 || target > 15) throw fail(400, 'bad_target');
+    const focusText = clean(focus.text, 200), focusNotes = clean(focus.notes, 2000) || null;
+    if (!focusText) throw fail(400, 'bad_focus');
     const rp = asObject(plan.roleplay);
     if (rp.skill != null && !R.SKILLS.includes(rp.skill)) throw fail(400, 'bad_skill');
     if (rp.character != null && !R.CHARACTERS.includes(rp.character)) throw fail(400, 'bad_character');
@@ -67,7 +78,7 @@ const OPS = {
     const x = await R.load(sql, rep);
     const c = x.cfg.compass;
     const wk = R.weekOf(x.today);
-    if ([...picks.values()].filter((v) => v === 'visit').length > c.max_visits) throw fail(400, 'too_many_visits');
+    // No weekly visit cap in the 1-on-1 any more (Yousef 2026-10-27: "remove the out of 15"); the rep's Friday check-in keeps it.
 
     const out = await asUser(me.id, async (tx) => {
       // Saves for one rep take turns, so two at once can't make two check-ins or two focus goals.
@@ -107,19 +118,19 @@ const OPS = {
       }
       // The session itself.
       const [s] = await tx`insert into one_on_ones (kind, rep_id, held_by_id, session_date, checkin_id, focus_action_target_count, skill, roleplay_character, roleplay_done_at, completed_at)
-        values ('weekly', ${rep.id}, ${me.id}, ${wk.mon}, ${checkin.id}, ${target}, ${rp.skill || null}, ${rp.character || null}, ${rp.done ? new Date() : null}, now())
+        values ('weekly', ${rep.id}, ${me.id}, ${wk.mon}, ${checkin.id}, ${null}, ${rp.skill || null}, ${rp.character || null}, ${rp.done ? new Date() : null}, now())
         on conflict (rep_id, kind, session_date) do update set held_by_id = excluded.held_by_id, checkin_id = excluded.checkin_id,
           focus_action_target_count = excluded.focus_action_target_count, skill = excluded.skill, roleplay_character = excluded.roleplay_character,
           roleplay_done_at = case when ${!!rp.done} then coalesce(one_on_ones.roleplay_done_at, now()) else null end,
           completed_at = now(), deleted_at = null
         returning id`;
-      // This week's focus: Edge's rule (writes.js focus_set): one goal per week, the latest wins. The week's earlier goal
-      // tasks are soft-deleted and the new one is the rep's task (source one_on_one, title = the goal key, due at the end
-      // of the week), tied to this session.
+      // This week's focus: one per week, the latest wins (Edge's rule). The week's earlier focus tasks (a goal key from Edge,
+      // or a typed focus from a 1-on-1) are soft-deleted; the new one is the rep's task (source one_on_one, title = the
+      // focus line, body = the manager's notes, due at the end of the week), tied to this session.
       await tx`update tasks set deleted_at = now() where assignee_id = ${rep.id} and source = 'one_on_one' and deleted_at is null
-        and title = any(${R.GOALS}) and due_at >= ${wk.start} and due_at <= ${wk.end}`;
-      const [t] = await tx`insert into tasks (assignee_id, created_by_id, title, kind, status, source, due_at, one_on_one_id)
-        values (${rep.id}, ${me.id}, ${focus.goal}, 'todo', 'open', 'one_on_one', ${wk.end}, ${s.id}) returning id`;
+        and (title = any(${R.GOALS}) or one_on_one_id is not null) and due_at >= ${wk.start} and due_at <= ${wk.end}`;
+      const [t] = await tx`insert into tasks (assignee_id, created_by_id, title, body, kind, status, source, due_at, one_on_one_id)
+        values (${rep.id}, ${me.id}, ${focusText}, ${focusNotes}, 'todo', 'open', 'one_on_one', ${wk.end}, ${s.id}) returning id`;
       await syncCommitments(tx, me, rep, s.id, list, wk.end);
       return { id: s.id, checkinId: checkin.id, focusTaskId: t.id };
     });

@@ -34,9 +34,12 @@ Screenshots of every screen in the handoff's states (for side-by-side checks aga
 
 | Weekly (tab "Weekly") | Monthly (tab "Monthly") |
 |---|---|
-| 1 Last week (08) · 2 Second look (09) · 3 Visits (10) · 4 Roleplay (10b) · 5 Calls (11) · 6 Focus (12) · Done (13) | 1 Last month (14) · 2 Next month (15) · 3 My Fifty (16) · 4 Growth (17) · Done (18) |
+| 1 Wins · 2 Numbers · 3 Visits · 4 Roleplay · 5 Calls · 6 Focus (typed) · Done (reworked 2026-10-27) | 1 Last month (14) · 2 Next month (15) · 3 My Fifty (16) · 4 Growth (17) · Done (18) |
 
-The person menu (top right) picks which rep the 1-on-1 is with.
+The person menu (top right) picks which rep the 1-on-1 is with. A third tab, **Second look**, is the manager's own list of
+picks that differed from the suggestion (not part of the meeting). "Find a customer" on every weekly step changes a
+customer's plan for the week. The typed focus is written up by Claude (`api/_compass/ai.js`, model claude-opus-5-5,
+low effort) when **`ANTHROPIC_API_KEY`** is set on the Vercel project; without it the typed words are saved as they are.
 
 ## Deploying on Vercel (owner steps)
 

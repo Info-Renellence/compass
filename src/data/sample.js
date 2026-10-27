@@ -63,7 +63,7 @@ function weekly(rep) {
       { title: 'Raj Sample reordered', sub: '$1,350 · Oct 13' },
     ],
     // Last week's focus (the previous session's focus task + action target), with actuals counted from Pulse and orders.
-    lastFocus: { goal: 'close', setLabel: 'Set Oct 19', actionDone: 2, actionTarget: 3, result: 0, resultNote: 'Dr. Noor said next week' },
+    lastFocus: { goal: null, text: 'Get Dr. Noor and Ken to a first order this week.', setLabel: 'Set Oct 19' },
     tiles: {
       fifty: { count: 22, note: 'No change this week' },
       forecastLanded: { landed: 1, due: 3 },
@@ -166,4 +166,12 @@ export const sample = {
   saveWeekly: (repId, plan) => { console.info('[sample] weekly 1-on-1 not saved (sample data)', repId, plan); return wait({ ok: true, sample: true }); },
   saveCommitments: (repId, list) => { console.info('[sample] commitments not saved (sample data)', repId, list); return wait({ ok: true, sample: true }); },
   saveMonthly: (repId, plan) => { console.info('[sample] monthly 1-on-1 not saved (sample data)', repId, plan); return wait({ ok: true, sample: true }); },
+  // The focus write-up: on sample data the notes come back tidied (no AI is called).
+  focusDraft: (repId, notes) => wait({ line: String(notes).replace(/\s+/g, ' ').trim().replace(/^./, (c) => c.toUpperCase()).slice(0, 200), sample: true }),
+  // Cat's second-look list: picks that differed from the suggestion over the last weeks, and how they turned out.
+  secondLookList: (repId) => wait({ rep: { id: repOf(repId).id, first: repOf(repId).first }, weeks: 8, rows: [
+    { id: 'noor:1', contactId: 'noor', name: 'Dr. Noor Sample', ini: 'DN', group: 'candidate', week: 'Oct 26', repPick: 'call', suggestedPick: 'visit', why: 'Samples 20 days ago, no order', fact: 'Samples 20 days ago · no order yet', finalPick: 'call', outcome: { ordered: false, text: 'No order since' } },
+    { id: 'omar:1', contactId: 'omar', name: 'Omar Sample', ini: 'OS', group: 'fifty', week: 'Oct 26', repPick: 'wait', suggestedPick: 'visit', why: 'Going quiet', fact: 'My Fifty · 38 days since the last order or visit', finalPick: 'wait', outcome: { ordered: false, text: 'No order since' } },
+    { id: 'zoe:1', contactId: 'zoe', name: 'Zoe Sample', ini: 'ZS', group: 'fifty', week: 'Oct 19', repPick: 'visit', suggestedPick: 'wait', why: 'Ordered recently', fact: 'Ordered Oct 8 · nothing due right now', finalPick: 'visit', outcome: { ordered: true, text: 'Ordered Oct 22 · $1,350' } },
+  ] }),
 };

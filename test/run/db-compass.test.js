@@ -60,19 +60,21 @@ test('reads: session, weekly and monthly have the screens\' shape', async (sql) 
   ok(m.data.fifty.some((f) => f.id === fifty.id && f.suggested === 'at_risk'), 'fifty status suggested');
 });
 
-test('weekly_save: check-in, picks, session, focus task (latest wins), commitments; all logged as compass; 15-visit cap from settings', async (sql) => {
+test('weekly_save: check-in, picks, session, typed focus task (latest wins), commitments; all logged as compass; no visit cap (2026-10-27)', async (sql) => {
   const { admin, rep, cand, fifty } = await setup(sql);
   const w = (await h.get(admin, 'weekly', { rep: rep.id })).data;
   const plan = (goal) => ({ picks: w.accounts.map((a) => ({ id: a.id, finalPick: a.id === fifty.id ? 'call' : a.repPick })), secondLook: [],
-    focus: { goal, actionTarget: 4 }, roleplay: { skill: 'price_pushback', character: 'skeptic', done: true }, commitments: ['Send the price-objection guide'] });
-  const r1 = await h.post(admin, 'weekly_save', { repId: rep.id, plan: plan('close') });
+    focus: { text: goal, notes: 'notes for ' + goal }, roleplay: { skill: 'price_pushback', character: 'skeptic', done: true }, commitments: ['Send the price-objection guide'] });
+  const r1 = await h.post(admin, 'weekly_save', { repId: rep.id, plan: plan('Get Dr. Sample to a first order') });
   eq(r1.status, 200, 'saved ' + JSON.stringify(r1.data));
-  const r2 = await h.post(admin, 'weekly_save', { repId: rep.id, plan: plan('warm') });
+  const r2 = await h.post(admin, 'weekly_save', { repId: rep.id, plan: plan('Call every clinic going quiet') });
   eq(r2.data.id, r1.data.id, 'one weekly session per week');
   const [o] = await sql`select * from one_on_ones where id = ${r1.data.id}`;
-  eq([o.kind, o.focus_action_target_count, o.skill, !!o.roleplay_done_at, o.held_by_id], ['weekly', 4, 'price_pushback', true, admin.id], 'session');
-  const goals = await sql`select title, one_on_one_id from tasks where assignee_id = ${rep.id} and source = 'one_on_one' and deleted_at is null`;
-  eq(goals.map((g) => [g.title, g.one_on_one_id]), [['warm', r1.data.id]], 'one live goal, the latest');
+  eq([o.kind, o.focus_action_target_count, o.skill, !!o.roleplay_done_at, o.held_by_id], ['weekly', null, 'price_pushback', true, admin.id], 'session');
+  const goals = await sql`select title, body, one_on_one_id from tasks where assignee_id = ${rep.id} and source = 'one_on_one' and deleted_at is null`;
+  eq(goals.map((g) => [g.title, g.body, g.one_on_one_id]), [['Call every clinic going quiet', 'notes for Call every clinic going quiet', r1.data.id]], 'one live focus, the latest, with the notes');
+  const again = (await h.get(admin, 'weekly', { rep: rep.id })).data;
+  eq([again.saved.focusText, again.saved.focusNotes], ['Call every clinic going quiet', 'notes for Call every clinic going quiet'], 'reopened week shows the focus');
   const com = await sql`select assignee_id, contact_id, title from tasks where one_on_one_id = ${r1.data.id} and assignee_id <> ${rep.id} and deleted_at is null`;
   eq(com.map((t) => [t.assignee_id, t.contact_id, t.title]), [[admin.id, null, 'Send the price-objection guide']], 'commitment for the admin, no contact');
   eq((await h.post(admin, 'weekly_commitments', { repId: rep.id, commitments: ['Join Tessa at the visit'] })).status, 200, 'commitments changed');
@@ -84,9 +86,49 @@ test('weekly_save: check-in, picks, session, focus task (latest wins), commitmen
     ok(logs.length && logs.every((l) => l.source === 'compass'), t + ' logged as compass');
   }
   await sql`update settings set value = value || '{"max_visits": 1}'::jsonb where key = 'compass'`;
-  const two = plan('close'); two.picks = two.picks.map((x) => (x.id === fifty.id ? { id: x.id, finalPick: 'visit' } : x));
-  eq((await h.post(admin, 'weekly_save', { repId: rep.id, plan: two })).data.error, 'too_many_visits', 'cap from settings');
-  eq((await h.post(admin, 'weekly_save', { repId: rep.id, plan: Object.assign(plan('close'), { focus: { goal: 'referrals', actionTarget: 3 } }) })).data.error, 'bad_goal');
+  const two = plan('Visit them all'); two.picks = two.picks.map((x) => (x.id === fifty.id ? { id: x.id, finalPick: 'visit' } : x));
+  eq((await h.post(admin, 'weekly_save', { repId: rep.id, plan: two })).status, 200, 'no visit cap in the 1-on-1 any more');
+  const park = plan('Park one'); park.picks = park.picks.map((x) => (x.id === fifty.id ? { id: x.id, finalPick: 'park' } : x));
+  eq((await h.post(admin, 'weekly_save', { repId: rep.id, plan: park })).status, 200, 'Park from Find a customer');
+  eq((await h.post(admin, 'weekly_save', { repId: rep.id, plan: Object.assign(plan('x'), { focus: { text: '   ' } }) })).data.error, 'bad_focus');
+});
+
+test('focus_draft: without ANTHROPIC_API_KEY it answers line null (not_set_up); with a client it returns the line; a refusal falls back', async (sql) => {
+  const { admin, rep } = await setup(sql);
+  const AI = require('../../api/_compass/ai');
+  const key = process.env.ANTHROPIC_API_KEY;
+  try {
+    delete process.env.ANTHROPIC_API_KEY;
+    const off = await h.post(admin, 'focus_draft', { repId: rep.id, notes: 'close noor and ken' });
+    eq([off.status, off.data.line, off.data.reason], [200, null, 'not_set_up'], 'not set up');
+    eq((await h.post(admin, 'focus_draft', { repId: rep.id, notes: '  ' })).data.error, 'bad_focus', 'empty notes');
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    let sent = null;
+    AI._setClient({ beta: { messages: { create: async (p) => { sent = p; return { stop_reason: 'end_turn', content: [{ type: 'text', text: '"Get Noor and Ken to a first order this week."' }] }; } } } });
+    const on = await h.post(admin, 'focus_draft', { repId: rep.id, notes: 'close noor and ken' });
+    eq(on.data.line, 'Get Noor and Ken to a first order this week.', 'the line, quotes stripped');
+    ok(sent && sent.model === AI.MODEL && sent.fallbacks === 'default' && /close noor and ken/.test(sent.messages[0].content), 'request shape');
+    AI._setClient({ beta: { messages: { create: async () => ({ stop_reason: 'refusal', content: [] }) } } });
+    eq((await h.post(admin, 'focus_draft', { repId: rep.id, notes: 'x' })).data.reason, 'declined', 'a refusal keeps the typed words');
+  } finally {
+    AI._setClient(null);
+    if (key == null) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = key;
+  }
+});
+
+test('second_look_list: picks that differed from the suggestion in sent check-ins, with ordered-since', async (sql) => {
+  const { admin, rep, cand } = await setup(sql);
+  const w = (await h.get(admin, 'weekly', { rep: rep.id })).data;
+  const [ck] = await sql`insert into checkins (rep_id, week_start_date, submitted_at) values (${rep.id}, ${w.session.weekStartDate}, now())
+    on conflict (rep_id, week_start_date) do update set submitted_at = now() returning id`;
+  await sql`delete from account_picks where checkin_id = ${ck.id} and contact_id = ${cand.id}`;
+  await sql`insert into account_picks (checkin_id, contact_id, sort_group, suggested_pick, suggested_reason, rep_pick)
+    values (${ck.id}, ${cand.id}, 'candidate', 'visit', 'Samples, no order', 'wait')`;
+  const r = await h.get(admin, 'second_look_list', { rep: rep.id });
+  eq(r.status, 200, 'answers');
+  const row = r.data.rows.find((x) => x.contactId === cand.id);
+  ok(row && row.repPick === 'wait' && row.suggestedPick === 'visit' && typeof row.outcome.ordered === 'boolean', 'the differing pick, with an outcome');
+  ok(r.data.rows.every((x) => x.repPick !== x.suggestedPick), 'only differing picks');
 });
 
 test('monthly_save: skill, gap forecast, My Fifty statuses, committed forecast; logged as compass', async (sql) => {

@@ -443,3 +443,46 @@ body { color: var(--navy); }
 .qcard.dark .k { color: #fff; opacity: .85; }
 .qcard .q { display: block; font-size: var(--fs-h2); font-weight: 700; margin-top: 6px; }
 .convo .hint { font-size: 13px; color: var(--text-2); padding: 0 4px; }
+
+/* ---- Weekly 1-on-1 rework (Yousef 2026-10-27) ---- */
+/* Step 1: wins, big and first */
+.wins-hero { border-radius: var(--r-lg); padding: 26px 26px 28px; background: linear-gradient(135deg, var(--gold-cream), #FFFFFF 70%); box-shadow: inset 0 0 0 1px var(--gold-line); }
+.wins-hero .wh-k { display: block; font-size: 12px; font-weight: 800; letter-spacing: 1.2px; color: var(--gold-ink); margin-bottom: 16px; }
+.wh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.wh-card { display: flex; flex-direction: column; gap: 8px; padding: 20px; border-radius: var(--r-lg); background: #FFFFFF; box-shadow: inset 0 0 0 1px var(--gold-line), 0 6px 18px rgba(16, 32, 64, .06); }
+.wh-star { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--gold-1), var(--gold-2)); color: var(--gold-ink); display: flex; align-items: center; justify-content: center; }
+.wh-t { font-size: 20px; font-weight: 800; line-height: 1.25; color: var(--navy, #0f172a); }
+.wh-s { font-size: 14px; color: var(--text-2); }
+.wh-none { display: flex; flex-direction: column; gap: 6px; padding: 8px 2px; }
+/* Step 2: numbers */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+@media (max-width: 860px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Find a customer */
+.find-row { display: flex; justify-content: flex-end; margin: -4px 0 12px; }
+.find-btn { display: inline-flex; align-items: center; gap: 6px; }
+.find-wrap { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .28); display: flex; align-items: flex-start; justify-content: center; padding: 72px 16px 16px; }
+.find-card { width: min(720px, 100%); max-height: calc(100vh - 100px); overflow: auto; }
+.find-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: var(--r-md, 10px); border: 1px solid var(--line, #d9dee7); margin: 4px 0 10px; }
+.find-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line, #eef1f5); flex-wrap: wrap; }
+.find-item .tx { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; }
+.find-item .tx span { font-size: 13px; color: var(--text-2); }
+.find-seg { display: inline-flex; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line, #d9dee7); overflow: hidden; }
+.find-seg button { border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; cursor: pointer; color: var(--text-2); }
+.find-seg button.on { background: var(--blue, #1170c0); color: #fff; }
+/* Step 6: typed focus */
+.focus-type { display: grid; gap: 14px; }
+.focus-notes, .focus-final { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; line-height: 1.5; padding: 12px; border-radius: var(--r-md, 10px); border: 1px solid var(--line, #d9dee7); resize: vertical; }
+.focus-notes { min-height: 110px; }
+.focus-final { min-height: 64px; font-size: 18px; font-weight: 700; }
+.focus-acts { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.focus-acts .sbtn { display: inline-flex; align-items: center; gap: 6px; }
+.focus-line .k { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--text-2); margin-bottom: 8px; }
+/* Cat's second-look list */
+.sl2-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line, #eef1f5); flex-wrap: wrap; }
+.sl2-row .tx { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; }
+.sl2-row .tx span { font-size: 13px; color: var(--text-2); }
+.sl2-picks { display: flex; flex-direction: column; font-size: 13px; min-width: 190px; }
+.sl2-picks .k { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--text-2); }
+.sl2-out { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #F1F5F9; color: var(--text-2); }
+.sl2-out.yes { background: #DCFCE7; color: #15803D; }
+.find-item .ava, .sl2-row .ava { width: var(--ava-md); height: var(--ava-md); font-size: 13px; }
