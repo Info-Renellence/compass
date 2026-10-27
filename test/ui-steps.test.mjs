@@ -54,7 +54,12 @@ test('every weekly and monthly step, and the done screens, open at the top', asy
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     assert.equal(await page.locator('.livecount').count(), 0, 'nor on Numbers');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
-    await page.locator('.livecount').waitFor({ timeout: 5000 });   // from Visits on
+    await page.locator('.livecount').waitFor({ timeout: 5000 });   // on Visits
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await page.getByText('PRACTISING', { exact: false }).first().waitFor({ timeout: 5000 });
+    assert.equal(await page.locator('.livecount').count(), 0, 'nor on Roleplay');
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await page.locator('.livecount').waitFor({ timeout: 5000 });   // back on Calls
     await page.getByRole('button', { name: 'Find a customer' }).click();
     await page.getByLabel('Customer name').fill('Noor');
     await page.getByRole('radio', { name: 'Park' }).first().click();

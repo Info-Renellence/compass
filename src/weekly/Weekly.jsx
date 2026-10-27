@@ -151,8 +151,8 @@ function Session({ d, repId }) {
       {/* Owner 2026-10-23: the session line lives in the top bar, the step subtitles are gone, and the banner carries a
           live count of this week's visits and calls. */}
       <SessionLine text={sessionText} />
-      {/* The visit/call count is for the week being planned, so it shows from Visits on, not on Wins or Numbers (owner 2026-10-27). */}
-      <Banner title={TITLES[s.step - 1]} center={s.step > 2 ? <LiveCount visits={visits.length} calls={calls.length} /> : null}
+      {/* The visit/call count is for the week being planned, so it shows on Visits, Calls and Focus only, not on Wins, Numbers or Roleplay (owner 2026-10-27). */}
+      <Banner title={TITLES[s.step - 1]} center={[3, 5, 6].includes(s.step) ? <LiveCount visits={visits.length} calls={calls.length} /> : null}
         steps={STEPS} step={s.step} reached={6} onStep={goStep} />
       <div className="find-row">
         <button type="button" className="sbtn find-btn" onClick={() => setFinding(true)}><Icon name="search" size={14} />Find a customer</button>
