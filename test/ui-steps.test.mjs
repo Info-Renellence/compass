@@ -50,6 +50,11 @@ test('every weekly and monthly step, and the done screens, open at the top', asy
     await page.goto('http://127.0.0.1:' + PORT + '/#/weekly');
     await page.getByText(/WINS LAST WEEK/).waitFor({ timeout: 30000 });
     assert.equal(await page.getByText('/ 15').count(), 0, 'no visit cap shown');
+    assert.equal(await page.locator('.livecount').count(), 0, 'no visit/call counter on Wins');
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    assert.equal(await page.locator('.livecount').count(), 0, 'nor on Numbers');
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await page.locator('.livecount').waitFor({ timeout: 5000 });   // from Visits on
     await page.getByRole('button', { name: 'Find a customer' }).click();
     await page.getByLabel('Customer name').fill('Noor');
     await page.getByRole('radio', { name: 'Park' }).first().click();
