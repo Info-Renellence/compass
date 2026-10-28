@@ -1,5 +1,4 @@
-// Copied from renellence-edge/api/_edge/book.js (no-hubspot 3714363, 2026-10-23) for Compass, unchanged below this line. Never fork the rules: change Edge, My Fifty and this copy together.
-// Copied from my-fifty/api/_book.js (my-fifty af84c17, 2026-10-21) so Edge and My Fifty work out v2 the same way. Keep the two in sync.
+// Copied from my-fifty/api/_book.js (my-fifty fe1bd17, 2026-10-28) for Compass by renellence-ops/ops/shared/sync.js. Never edit this copy: change My Fifty's file, then run sync.js.
 // A rep's book, with everything My Fifty shows worked out from v2's records (nothing derived is stored,
 // SOP section 9):
 //
@@ -118,7 +117,7 @@ async function book(sql, me, opts) {
              max(i.occurred_at) filter (where i.kind = 'meeting' and i.mode in ('in_person', 'video') and i.status is distinct from 'cancelled'
                                          and ${REACHED(sql)}) as last_visit_at,   -- a video call counts as a visit; a no-show does not (S1, Yousef 2026-10-22)
              count(*) filter (where i.kind <> 'note' and not ${INBOUND(sql)}) as touches,
-             bool_or(i.user_id = ${me.id} and not ${INBOUND(sql)} and (i.kind = 'text' or (i.kind in ('call', 'meeting') and ${REACHED(sql)}))
+             bool_or(i.user_id = ${me.id} and not ${INBOUND(sql)} and i.kind in ('call', 'meeting') and ${REACHED(sql)}   -- a text doesn't take them off Today (owner 2026-10-28)
                      and (i.occurred_at at time zone 'America/Toronto')::date = (now() at time zone 'America/Toronto')::date) as touched_today
         from interactions i
        where i.contact_id = any(${ids}) and i.deleted_at is null and i.status is distinct from 'scheduled' and i.status is distinct from 'cancelled'
