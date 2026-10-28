@@ -7,4 +7,4 @@ Baseline: test:db 8/8, fingerprint 2/2, build ok, test:ui 1/1.
 - Real books: Compass monthly forecast totals equal Edge's Forecast page for all 5 real reps; Fifty count equals Edge and Pulse; stage groups match Edge's tabs (differences only from parked accounts and frozen check-in groups).
 - Browser on real books (1440 and 1024): found the top bar overflowing sideways at 1024 px -> fixed 5cf7861; rep list not scrollable -> fixed 38ac887.
 - Browser save flow on committed fake rows (demo-test-r4a-*): Save the week and Save November both 200; Pulse Today and Edge Home then show the typed focus and "2 visits"; a double-click on Save sends 2 saves and leaves 1 session and 1 focus.
-- Initials bug ("J(" for "Jo (Ann's Nurse)") fixed on local branch run4-fixes a0ef946 (api change, not pushed).
+- Initials bug ("J(" for "Jo (Ann's Nurse)") fixed on local branch run4-fixes 0e35bc4 (api change, not pushed).
