@@ -73,3 +73,25 @@ test('every weekly and monthly step, and the done screens, open at the top', asy
     await server.close();
   }
 });
+
+// Run 4 (2026-10-27): on an iPad held sideways (1024 px) the top bar fits, with no sideways scroll, on every view
+// (the monthly title pill used to push the rep chip past the edge).
+test('the top bar fits at 1024 px on every view (no sideways scroll)', async () => {
+  delete process.env.VITE_DATA_SOURCE;
+  const server = await createServer({ root: ROOT, logLevel: 'silent', server: { port: PORT + 1, strictPort: true, host: '127.0.0.1' } });
+  await server.listen();
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    for (const view of ['weekly', 'monthly', 'second-look']) {
+      await page.goto('http://127.0.0.1:' + (PORT + 1) + '/#/' + view);
+      await page.locator('.cx-who').waitFor({ timeout: 30000 });
+      await page.waitForTimeout(500);
+      const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      assert.ok(over <= 1, view + ' is ' + over + ' px wider than the window');
+    }
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+});
