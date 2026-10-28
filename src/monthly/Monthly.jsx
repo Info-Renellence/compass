@@ -30,6 +30,9 @@ function Session({ d, repId }) {
   const base = nm.forecast.reduce((t, f) => t + f.amount, 0);
   const total = base + nm.gap.reduce((t, g) => t + (s.added[g.id] ? g.amount : 0), 0);
   const skill = skillByKey(s.skill);
+  // Claude's ranked suggestions for the gap (owner 2026-10-28), shown inside "Could close the gap"; nothing if there are none.
+  const [ai, setAi] = useState(null);
+  useEffect(() => { data.gapRanking(repId).then(setAi, () => {}); }, [repId]);
   useEffect(() => { flash(''); }, [s.step]);   // a toast never outlives its step
   // Each step and the done screen open at the top (Next sits at the bottom of a long step; run 3, 2026-10-23).
   useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { /* no window */ } }, [s.step, s.done]);
@@ -65,7 +68,7 @@ function Session({ d, repId }) {
       <Banner title={titles[s.step - 1]}
         steps={STEPS} step={s.step} reached={4} onStep={(k) => set({ step: k })} />
       {s.step === 1 ? <LastMonth d={d} rep={rep} /> : null}
-      {s.step === 2 ? <NextMonth d={d} rep={rep} base={base} total={total} added={s.added}
+      {s.step === 2 ? <NextMonth d={d} rep={rep} ai={ai} base={base} total={total} added={s.added}
         onToggle={(g) => { const on = !s.added[g.id]; set((x) => ({ added: Object.assign({}, x.added, { [g.id]: on }) })); if (on) flash('Added to ' + m.nextMonth + ' · ' + g.name); }} /> : null}
       {s.step === 3 ? <FiftyCheck d={d} status={s.status} onPick={(id, v) => set((x) => ({ status: Object.assign({}, x.status, { [id]: v }) }))} /> : null}
       {s.step === 4 ? <Growth month={m.nextMonth} boss={boss} skill={s.skill} onSkill={(k) => set({ skill: k })} /> : null}
@@ -117,7 +120,7 @@ function LastMonth({ d, rep }) {
   );
 }
 
-function NextMonth({ d, rep, base, total, added, onToggle }) {
+function NextMonth({ d, rep, ai, base, total, added, onToggle }) {
   const nm = d.nextMonth, m = d.session;
   const tgt = nm.target || 0;
   const gap = tgt - total;
@@ -154,6 +157,24 @@ function NextMonth({ d, rep, base, total, added, onToggle }) {
             );
           })}
           {!nm.gap.length ? <Empty icon="check" text="No accounts without a forecast" /> : null}
+          {ai && ai.rows.length ? (
+            <div className="gap-ai">
+              <span className="k">CLAUDE SUGGESTS</span>
+              {ai.rows.map((g) => {
+                const inGap = nm.gap.find((x) => x.id === g.id), on = !!added[g.id];
+                return (
+                  <div key={g.id} className={'grow-row' + (on ? ' on' : '')}>
+                    <span className="ava">{g.ini}</span><span className="tx"><b>{g.name}</b><span>{g.reason}</span></span><span className="amt">{money(g.amount)}</span>
+                    {inGap ? (
+                      <button type="button" className={'addb' + (on ? ' on' : '')} aria-pressed={on} onClick={() => onToggle(inGap)}>
+                        {on ? <><Icon name="check" size={14} />Added</> : <><Icon name="plus" size={14} />Add</>}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </section>
       </div>
     </>

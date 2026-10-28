@@ -5,6 +5,7 @@ const { fail, isUuid } = require('./http');
 const T = require('./time');
 const B = require('./book');
 const R = require('./rules');
+const S = require('./suggestions');
 
 // The rep a session is with: an active users row of kind rep.
 async function repFor(sql, id) {
@@ -317,6 +318,87 @@ const OPS = {
         .map((p) => ({ id: p.id, name: p.name, ini: R.initials(p.name), fact: R.fact(p, x), suggested: statusBy[p.id] || suggestedStatus(p, x), saved: statusBy[p.id] || null })),
       monthSkill: (sess && sess.skill) || prevSkill || 'price_pushback',
     };
+  },
+  // What Claude's timed jobs proposed, for review (owner 2026-10-28): new-lead tidy-ups and details found (latest per
+  // contact and kind, last 60 days) and the newest weekly data check. Only items nobody decided yet. Newest first.
+  // `kind::text` so a database that lacks a newer ai_outputs kind answers empty instead of failing.
+  async suggestions(sql) {
+    const rows = await sql`select distinct on (a.contact_id, a.kind) a.id, a.kind::text as kind, a.created_at, a.output_json,
+        c.id as cid, c.first_name, c.last_name, cl.name as clinic, u.full_name as owner
+      from ai_outputs a join contacts c on c.id = a.contact_id and c.deleted_at is null
+        left join clinics cl on cl.id = c.clinic_id left join users u on u.id = c.owner_id
+      where a.kind::text = any(${['lead_cleanup', 'enrichment']}) and a.created_at > now() - interval '60 days'
+      order by a.contact_id, a.kind, a.created_at desc`;
+    const cards = [];
+    for (const r of rows) {
+      const j = r.output_json || {};
+      if (j.status !== 'proposed') continue;
+      const items = (Array.isArray(j[S.LIST[r.kind]]) ? j[S.LIST[r.kind]] : []).map((it, index) => ({ it, index })).filter(({ it }) => S.isOpen(it))
+        .map(({ it, index }) => r.kind === 'enrichment'
+          ? { index, field: it.field, proposed: it.value, source: it.source || null, confidence: it.confidence || null, reason: it.evidence || '', auto: S.autoOf(r.kind, it) }
+          : { index, field: it.field, current: it.current == null ? null : it.current, proposed: it.proposed, confidence: it.confidence || null, reason: it.reason || '', auto: S.autoOf(r.kind, it) });
+      if (!items.length) continue;
+      const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || 'No name';
+      cards.push({ id: r.id, kind: r.kind, at: r.created_at, contactId: r.cid, name, ini: R.initials(name), clinic: r.clinic || '', owner: r.owner || '', items });
+    }
+    cards.sort((a, b) => new Date(b.at) - new Date(a.at));
+    // The newest data check (one row per weekly run): the items Claude thinks are a problem or isn't sure about.
+    const [h] = await sql`select id, created_at, output_json from ai_outputs where kind::text = 'data_health' order by created_at desc limit 1`;
+    let health = null;
+    if (h) {
+      const j = h.output_json || {};
+      const list = (Array.isArray(j.items) ? j.items : []).map((it, index) => ({ it, index })).filter(({ it }) => it && ['yes', 'unsure'].includes(it.problem) && S.isOpen(it));
+      const ids = [...new Set(list.flatMap(({ it }) => (Array.isArray(it.ids) ? it.ids : [])).filter(isUuid))];
+      const names = {};
+      if (ids.length) {
+        for (const c of await sql`select id, first_name, last_name from contacts where id = any(${ids})`) names[c.id] = [c.first_name, c.last_name].filter(Boolean).join(' ') || 'No name';
+        for (const c of await sql`select id, name from clinics where id = any(${ids})`) names[c.id] = c.name;
+      }
+      health = { id: h.id, at: h.created_at, summary: j.summary || '', items: list.map(({ it, index }) => ({ index, code: it.code || '', kind: it.kind || '', problem: it.problem, fix: it.fix || '',
+        confidence: it.confidence || null, reason: it.reason || '', who: (Array.isArray(it.ids) ? it.ids : []).filter(isUuid).map((id) => names[id]).filter(Boolean).slice(0, 6) })) };
+    }
+    return { cards, health };
+  },
+
+  // The 1-on-1 notes draft for this rep's week (a Fathom transcript turned into a draft) and how often last week's
+  // notes showed last week's focus. Both are empty when there is no data. The focus itself stays typed by Cat, no AI.
+  async weekly_notes(sql, me, q) {
+    const rep = await repFor(sql, q.get('rep'));
+    const wk = R.weekOf(T.ymd()), lw = R.weekOf(T.addDays(wk.mon, -7));
+    const [n] = await sql`select id, output_json from ai_outputs where kind::text = 'meeting_notes' and output_json->>'rep_id' = ${rep.id}
+      and output_json->>'week' = ${wk.mon} and coalesce(output_json->>'status', 'proposed') <> 'rejected' order by created_at desc limit 1`;
+    let notes = null;
+    if (n) {
+      const j = n.output_json || {};
+      notes = { id: n.id, title: j.title || '', shareUrl: /^https?:\/\//.test(j.share_url || '') ? j.share_url : null, meetingDate: j.meeting_date || null,
+        purposes: (Array.isArray(j.purposes) ? j.purposes : []).filter((p) => p && isUuid(p.contact_id) && p.purpose).map((p) => ({ contactId: p.contact_id, purpose: String(p.purpose), nextStep: p.next_step || '', used: !!p.used })),
+        commitments: (Array.isArray(j.cat_commitments) ? j.cat_commitments : []).filter((c) => c && c.text).map((c) => ({ text: String(c.text), due: c.due || null })),
+        openRequests: (Array.isArray(j.open_requests) ? j.open_requests : []).filter((t) => typeof t === 'string' && t) };
+    }
+    let focusSeen = null;
+    const f = await focusOf(sql, rep.id, lw);
+    if (f) {
+      const [c] = await sql`select count(*)::int as total, count(*) filter (where output_json->>'matches' = 'true')::int as matched from ai_outputs
+        where kind::text = 'focus_actions' and output_json->>'focus_task_id' = ${f.id}`;
+      if (c && c.total > 0) focusSeen = { matched: c.matched, total: c.total };
+    }
+    return { notes, focusSeen };
+  },
+
+  // Claude's ranked suggestions for closing next month's gap (the month the monthly 1-on-1 plans), with names; only
+  // for accounts in this rep's book. Empty when there is none.
+  async monthly_gap_ranking(sql, me, q) {
+    const rep = await repFor(sql, q.get('rep'));
+    const M = R.plannedMonth(T.ymd());
+    const [g] = await sql`select output_json from ai_outputs where kind::text = 'gap_ranking' and output_json->>'rep_id' = ${rep.id}
+      and output_json->>'month' = ${M} and coalesce(output_json->>'status', 'proposed') <> 'rejected' order by created_at desc limit 1`;
+    const list = g && Array.isArray(g.output_json.suggestions) ? g.output_json.suggestions.filter((s) => s && isUuid(s.contact_id)) : [];
+    const ids = list.map((s) => s.contact_id);
+    const names = ids.length ? Object.fromEntries((await sql`select id, first_name, last_name from contacts where id = any(${ids}) and owner_id = ${rep.id} and deleted_at is null`)
+      .map((c) => [c.id, [c.first_name, c.last_name].filter(Boolean).join(' ') || 'No name'])) : {};
+    const rows = list.filter((s) => names[s.contact_id]).sort((a, b) => (Number(a.rank) || 99) - (Number(b.rank) || 99))
+      .map((s) => ({ id: s.contact_id, name: names[s.contact_id], ini: R.initials(names[s.contact_id]), amount: Number(s.suggested_amount) || 0, reason: String(s.reason || '') }));
+    return { month: M, rows };
   },
 };
 

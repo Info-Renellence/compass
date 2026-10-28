@@ -154,15 +154,56 @@ test('missed visits: only picks that are still visits', async (sql) => {
   eq(w.missedVisits.map((m) => m.name), ['Noor Sample'], 'the visit, not the one turned into a call');
 });
 
+// Owner 2026-10-28: Claude's proposals are reviewed in Compass. v1 only has the lead_cleanup kind, so the other kinds
+// (enrichment, data_health, meeting_notes, gap_ranking, focus_actions) are covered by test/suggestions.test.mjs (pure
+// functions) and by the reads using kind::text, which answers empty here instead of failing.
+test('suggestion_decide: applies first name and role, refuses a bad enum, reject and by-hand accept change nothing on the contact', async (sql) => {
+  const { admin, rep } = await setup(sql);
+  const c = await h.contact(sql, rep, { first: 'noor sample', last: 'Old' });
+  const [row] = await sql`insert into ai_outputs (kind, contact_id, output_json) values ('lead_cleanup', ${c.id}, ${sql.json({ status: 'proposed', run_id: 'r1', suggestions: [
+    { field: 'first name', current: 'noor sample', proposed: 'Noor', confidence: 'high', reason: 'r' },
+    { field: 'Role', current: '', proposed: 'Injector', confidence: 'high', reason: 'r' },
+    { field: 'designation', current: '', proposed: 'wizard', confidence: 'low', reason: 'r' },
+    { field: 'last name', current: 'Old', proposed: 'Newname', confidence: 'medium', reason: 'r' },
+    { field: 'owner', current: '', proposed: 'Someone Else', confidence: 'medium', reason: 'r' },
+  ] })}) returning id`;
+  const seen = (await h.get(admin, 'suggestions')).data;
+  const card = seen.cards.find((x) => x.contactId === c.id);
+  ok(card && card.items.length === 5 && card.items[0].auto && !card.items[2].auto && !card.items[4].auto, 'the card lists open items, safe ones marked auto');
+  const dec = (index, decision) => h.post(admin, 'suggestion_decide', { id: row.id, index, decision });
+  const a0 = await dec(0, 'accept');
+  eq([a0.status, a0.data.applied], [200, true], 'first name applied');
+  eq((await dec(1, 'accept')).data.applied, true, 'role applied (case-insensitive)');
+  eq((await dec(2, 'accept')).status, 400, 'a value outside the enum is refused');
+  eq((await dec(3, 'reject')).data.applied, false, 'reject applies nothing');
+  const by = await dec(4, 'accept');
+  eq([by.data.applied, by.data.byHand], [false, true], 'owner is done by hand');
+  const [after] = await sql`select first_name, last_name, role, designation, owner_id from contacts where id = ${c.id}`;
+  eq([after.first_name, after.last_name, after.role, after.designation, after.owner_id], ['Noor', 'Old', 'injector', null, rep.id], 'only first name and role changed');
+  const [o] = await sql`select output_json j from ai_outputs where id = ${row.id}`;
+  eq(o.j.suggestions.map((x) => x.status || null), ['accepted', 'accepted', null, 'rejected', 'accepted'], 'statuses recorded; the refused one stays open');
+  eq([o.j.suggestions[0].decided_by, !!o.j.suggestions[0].decided_at, o.j.status, o.j.run_id], [admin.id, true, 'proposed', 'r1'], 'who and when, the rest of the row intact');
+  eq((await dec(0, 'reject')).status, 409, 'cannot decide twice');
+  eq((await h.post(admin, 'suggestion_decide', { id: row.id, index: 9, decision: 'accept' })).status, 404, 'no such item');
+  eq((await h.post(rep, 'suggestion_decide', { id: row.id, index: 2, decision: 'reject' })).status, 403, 'admins only');
+  const left = (await h.get(admin, 'suggestions')).data.cards.find((x) => x.contactId === c.id);
+  eq(left.items.map((x) => x.index), [2], 'only the open item is still listed');
+  for (const op of ['weekly_notes', 'monthly_gap_ranking']) eq((await h.get(admin, op, { rep: rep.id })).status, 200, op + ' answers when there is no data');
+});
+
 // Against Edge's committed files (git HEAD), so work in progress in Edge doesn't fail Compass.
 test('shared rules are exact copies of Edge\'s committed ones (never forked)', async () => {
   const edge = path.join(h.ROOT, '..', 'renellence-edge');
   if (!fs.existsSync(edge)) return;
   const { execFileSync } = require('child_process');
+  // The body every copy shares, by the same rule as renellence-ops/ops/shared/sync.js: LF line endings, the leading
+  // "// Copied from" header lines dropped (each copy has its own), require('./_x') and require('./x') written alike.
+  const body = (s) => s.replace(/\r\n/g, '\n').split('\n').filter((l, i, a) => !(a.slice(0, i + 1).every((x) => /^\/\/ Copied from/.test(x)))).join('\n')
+    .replace(/require\('\.\/_?(book|lists|time|http)'\)/g, "require('./$1')");
   for (const f of ['book', 'lists', 'time', 'http']) {
-    const mine = fs.readFileSync(path.join(h.ROOT, 'api/_compass', f + '.js'), 'utf8').split('\n').slice(1).join('\n');
+    const mine = fs.readFileSync(path.join(h.ROOT, 'api/_compass', f + '.js'), 'utf8');
     const theirs = execFileSync('git', ['-C', edge, 'show', 'HEAD:api/_edge/' + f + '.js'], { encoding: 'utf8' });
-    eq(mine === theirs, true, f + '.js matches Edge');
+    eq(body(mine) === body(theirs), true, f + '.js matches Edge');
   }
 });
 

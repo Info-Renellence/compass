@@ -5,6 +5,8 @@
 //   weekly_save         the agreed week: final picks, the second-look facts (kept for Cat's list), the roleplay, the typed
 //                       focus (Yousef 2026-10-27: free text, no goal, no AI), commitments
 //   weekly_commitments  the manager's commitments, changed on the done screen after the save
+//   suggestion_decide   accept or reject one item Claude proposed (owner 2026-10-28); only four safe contact fields are applied
+//   meeting_notes_use   put a 1-on-1 notes draft's purpose into the week's check-in row, or mark its commitments used
 //   monthly_save        the month's skill, forecasts added to close the gap, My Fifty statuses, the committed forecast
 const { asUser, db } = require('./db');
 const { fail, clean, isUuid } = require('./http');
@@ -12,6 +14,7 @@ const T = require('./time');
 const B = require('./book');
 const R = require('./rules');
 const Q = require('./reads');
+const S = require('./suggestions');
 
 const asObject = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const asList = (v) => (Array.isArray(v) ? v : []);
@@ -200,6 +203,63 @@ const OPS = {
       return { id: s.id, forecastsAdded: made, committed: sum.v };
     });
     return Object.assign({ ok: true }, out);
+  },
+  // Accept or reject one item of a Claude proposal (owner 2026-10-28). The decision is written inside that row's
+  // output_json in one jsonb_set update. Accept applies ONLY first name, last name, role and designation to the contact
+  // (values outside the enums are refused); everything else (owner, junk, duplicates, clinic, address, data checks) is
+  // "done by hand": only the status is recorded. Nothing is ever deleted or merged here.
+  async suggestion_decide(me, b) {
+    if (!isUuid(b.id) || !Number.isInteger(b.index) || b.index < 0 || !['accept', 'reject'].includes(b.decision)) throw fail(400, 'bad_input');
+    return asUser(me.id, async (tx) => {
+      const [row] = await tx`select id, kind::text as kind, contact_id, output_json from ai_outputs where id = ${b.id} for update`;
+      if (!row || !S.LIST[row.kind]) throw fail(404, 'not_found');
+      const list = (row.output_json || {})[S.LIST[row.kind]];
+      const item = Array.isArray(list) ? list[b.index] : null;
+      if (!item || typeof item !== 'object') throw fail(404, 'not_found');
+      if (!S.isOpen(item)) throw fail(409, 'already_decided');
+      let applied = null;
+      if (b.decision === 'accept' && row.kind !== 'data_health' && row.contact_id) {
+        applied = S.safeChange(item.field, row.kind === 'enrichment' ? item.value : item.proposed);
+        if (applied) {
+          // Column names come from the fixed list in suggestions.js, never from the request.
+          await tx`update contacts set ${tx({ [applied.column]: applied.value }, applied.column)} where id = ${row.contact_id} and deleted_at is null`;
+        }
+      }
+      let expr = tx`output_json`;
+      for (const st of S.decisionSteps(row.kind, b.index, b.decision, me.id, new Date().toISOString())) expr = tx`jsonb_set(${expr}, ${st.path}::text[], to_jsonb(${st.value}::text))`;
+      await tx`update ai_outputs set output_json = ${expr} where id = ${row.id}`;
+      return { ok: true, decision: b.decision, applied: !!applied, byHand: b.decision === 'accept' && !applied };
+    });
+  },
+
+  // Use a 1-on-1 notes draft (owner 2026-10-28). 'purpose': write that contact's purpose into account_picks.purpose of this
+  // rep's check-in for the draft's week, only if that row exists, and mark the purpose used. 'commitments': only marks
+  // the draft's commitments as used (they stay text; Cat's real commitments are still saved in the weekly step).
+  async meeting_notes_use(me, b) {
+    if (!isUuid(b.id) || !['purpose', 'commitments'].includes(b.what) || (b.what === 'purpose' && !isUuid(b.contactId))) throw fail(400, 'bad_input');
+    return asUser(me.id, async (tx) => {
+      const [row] = await tx`select id, output_json from ai_outputs where id = ${b.id} and kind::text = 'meeting_notes' for update`;
+      if (!row) throw fail(404, 'not_found');
+      const j = row.output_json || {};
+      const at = new Date().toISOString();
+      const mark = async (steps) => {
+        let expr = tx`output_json`;
+        for (const st of steps) expr = tx`jsonb_set(${expr}, ${st.path}::text[], ${typeof st.value === 'boolean' ? tx`to_jsonb(${st.value}::boolean)` : tx`to_jsonb(${st.value}::text)`})`;
+        await tx`update ai_outputs set output_json = ${expr} where id = ${row.id}`;
+      };
+      if (b.what === 'commitments') {
+        await mark([{ path: ['commitments_used'], value: true }, { path: ['commitments_used_by'], value: me.id }, { path: ['commitments_used_at'], value: at }]);
+        return { ok: true, applied: true };
+      }
+      const i = (Array.isArray(j.purposes) ? j.purposes : []).findIndex((p) => p && p.contact_id === b.contactId);
+      if (i < 0 || !isUuid(j.rep_id) || !/^\d{4}-\d{2}-\d{2}$/.test(j.week || '')) throw fail(404, 'not_found');
+      const purpose = clean(j.purposes[i].purpose, 500);
+      const done = await tx`update account_picks ap set purpose = ${purpose} from checkins c
+        where c.id = ap.checkin_id and c.rep_id = ${j.rep_id} and c.week_start_date = ${j.week} and ap.contact_id = ${b.contactId} returning ap.id`;
+      if (!done.length) return { ok: true, applied: false };   // no check-in row for this account yet: nothing written, nothing marked
+      await mark([{ path: ['purposes', String(i), 'used'], value: true }, { path: ['purposes', String(i), 'used_by'], value: me.id }, { path: ['purposes', String(i), 'used_at'], value: at }]);
+      return { ok: true, applied: true, purpose };
+    });
   },
 };
 

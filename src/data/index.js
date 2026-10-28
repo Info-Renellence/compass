@@ -14,6 +14,12 @@
 //   saveCommitments(repId, commitments) -> { ok }   the manager's commitments, changed on the done screen
 //   saveMonthly(repId, plan)  -> { ok }   plan: { addedForecasts: [id], fiftyStatus: [{ id, status }], skill }
 //   secondLookList(repId)     -> { rep, weeks, rows }   Cat's list: picks that differed from the suggestion, and what happened
+//   suggestions()             -> { cards: [{ id, kind, contactId, name, ini, clinic, owner, items: [{ index, field, current, proposed, source, confidence, reason, auto }] }],
+//                                  health: { id, summary, items: [{ index, code, kind, problem, fix, confidence, reason, who }] } | null }
+//   decideSuggestion(id, index, decision) -> { ok, applied, byHand }   decision: 'accept' | 'reject' (owner 2026-10-28)
+//   weeklyNotes(repId)        -> { notes: { id, title, shareUrl, purposes, commitments, openRequests } | null, focusSeen: { matched, total } | null }
+//   useNotes(id, what, contactId) -> { ok, applied }   what: 'purpose' | 'commitments'
+//   gapRanking(repId)         -> { month, rows: [{ id, name, ini, amount, reason }] }
 // API only: config() -> { googleClientId }, signIn(credential) -> { token, me }, signOut().
 import { sample } from './sample.js';
 
@@ -56,6 +62,11 @@ const api = {
   saveCommitments(repId, commitments) { return this.call('weekly_commitments', { repId, commitments }); },
   saveMonthly(repId, plan) { return this.call('monthly_save', { repId, plan }); },
   secondLookList(repId) { return this.call('second_look_list&rep=' + encodeURIComponent(repId)); },
+  suggestions() { return this.call('suggestions'); },
+  decideSuggestion(id, index, decision) { return this.call('suggestion_decide', { id, index, decision }); },
+  weeklyNotes(repId) { return this.call('weekly_notes&rep=' + encodeURIComponent(repId)); },
+  useNotes(id, what, contactId) { return this.call('meeting_notes_use', { id, what, contactId }); },
+  gapRanking(repId) { return this.call('monthly_gap_ranking&rep=' + encodeURIComponent(repId)); },
 };
 
 // Plain words for the errors the API can answer with.
@@ -65,6 +76,8 @@ const WORDS = {
   google_failed: 'Google sign-in didn’t go through. Try again.',
   bad_focus: 'Type this week’s focus first.',
   save_first: 'Save the week first.',
+  bad_value: 'That value isn’t one Compass can save. Change it by hand.',
+  already_decided: 'That one was already decided.',
   database_not_configured: 'Compass can’t reach the database right now.',
 };
 export const words = (e) => (e && WORDS[e.code]) || (e && e.status >= 500 ? 'Something went wrong on our side. Try again.' : 'Something went wrong.');

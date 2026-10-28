@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "shots": "node scripts/shots.mjs",
     "test:db": "node --require ./test/run/no-network.js test/run/db-compass.test.js",
+    "test:unit": "node --test test/suggestions.test.mjs",
     "test:ui": "node --require ./test/run/no-network.js --test test/ui-steps.test.mjs",
     "serve:test": "node --require ./test/run/no-network.js test/run/serve.js"
   },

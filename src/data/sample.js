@@ -172,4 +172,25 @@ export const sample = {
     { id: 'omar:1', contactId: 'omar', name: 'Omar Sample', ini: 'OS', group: 'fifty', week: 'Oct 26', repPick: 'wait', suggestedPick: 'visit', why: 'Going quiet', fact: 'My Fifty · 38 days since the last order or visit', finalPick: 'wait', outcome: { ordered: false, text: 'No order since' } },
     { id: 'zoe:1', contactId: 'zoe', name: 'Zoe Sample', ini: 'ZS', group: 'fifty', week: 'Oct 19', repPick: 'visit', suggestedPick: 'wait', why: 'Ordered recently', fact: 'Ordered Oct 8 · nothing due right now', finalPick: 'visit', outcome: { ordered: true, text: 'Ordered Oct 22 · $1,350' } },
   ] }),
+  // Claude's proposals for review (fictional). Nothing is saved.
+  suggestions: () => wait({
+    cards: [
+      { id: 's1', kind: 'lead_cleanup', contactId: 'ava', name: 'ava sample', ini: 'AS', clinic: 'Sample Aesthetics', owner: 'Tessa Ward', items: [
+        { index: 0, field: 'first name', current: 'ava sample', proposed: 'Ava', confidence: 'high', reason: 'The whole name was typed in the first-name box.', auto: true },
+        { index: 1, field: 'last name', current: '', proposed: 'Sample', confidence: 'high', reason: 'Same as above.', auto: true },
+        { index: 2, field: 'duplicate', current: 'Ava Sample', proposed: 'Same person as Dr. Ava Sample', confidence: 'medium', reason: 'Same email and clinic.', auto: false }] },
+      { id: 's2', kind: 'enrichment', contactId: 'cal', name: 'Dr. Cal Sample', ini: 'CS', clinic: 'Cal Sample Clinic', owner: 'Tessa Ward', items: [
+        { index: 0, field: 'designation', proposed: 'md', source: 'https://example.com/team', confidence: 'medium', reason: 'The clinic site lists him as MD.', auto: true }] },
+    ],
+    health: { id: 'h1', summary: '2 things to look at', items: [
+      { index: 0, code: 'no_owner', kind: 'contact', problem: 'yes', fix: 'Give these two leads an owner', confidence: 'high', reason: 'Both came in from ads a week ago.', who: ['Rob Sample', 'Gus Sample'] }] },
+  }),
+  decideSuggestion: (id, index, decision) => { console.info('[sample] suggestion not saved (sample data)', id, index, decision); return wait({ ok: true, applied: decision === 'accept' && index < 2, byHand: decision === 'accept' && index >= 2 }); },
+  weeklyNotes: () => wait({
+    notes: { id: 'n1', title: 'Weekly 1-on-1', shareUrl: 'https://example.com/fathom/sample', purposes: [{ contactId: 'noor', purpose: 'Ask how the samples did, then for the order date', nextStep: '', used: false }],
+      commitments: [{ text: 'Send the price-objection guide', due: '2026-10-30' }], openRequests: ['A post for the lips launch'] },
+    focusSeen: { matched: 3, total: 4 },
+  }),
+  useNotes: (id, what, contactId) => { console.info('[sample] notes not saved (sample data)', id, what, contactId); return wait({ ok: true, applied: true }); },
+  gapRanking: () => wait({ month: '2026-11', rows: [{ id: 'kai', name: 'Kai Sample', ini: 'KS', amount: 2700, reason: 'Orders every 5 weeks and is due.' }] }),
 };

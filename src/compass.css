@@ -498,3 +498,27 @@ body { color: var(--navy); }
 .rp-intro-text .skip { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 6px; }
 @keyframes rp-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .rp-intro { animation: none; } }
+
+/* Suggestions tab (owner 2026-10-28): Claude's proposals for review, and the small notes from the 1-on-1 notes draft. */
+.sg { margin-bottom: 16px; }
+.sg-card { padding: 12px 0; border-top: 1px solid var(--line, #eef1f5); display: flex; flex-direction: column; gap: 8px; }
+.sg-who { display: flex; align-items: center; gap: 12px; }
+.sg-who .ava { width: var(--ava-md); height: var(--ava-md); font-size: 13px; }
+.sg-who .tx, .sg-item .tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.sg-who .tx span { font-size: 13px; color: var(--text-2); }
+.sg-item { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-left: 48px; }
+.sg-item .why { font-size: 13px; color: var(--text-2); }
+.sg-item a.why { color: var(--blue); }
+.sg-btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sg-hint { font-size: 12px; color: var(--text-2); }
+.sg-state { font-size: 13px; font-weight: 700; color: var(--ok); }
+.sg-state.hand { color: var(--navy); }
+.sg-conf { display: inline-flex; height: 20px; padding: 0 8px; margin-left: 4px; border-radius: var(--r-pill); align-items: center; font-size: 11px; font-weight: 700; background: var(--chip); color: var(--text-2); }
+.sg-conf.high { background: var(--tint); color: var(--blue); }
+.nt-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; font-size: 13px; color: var(--text-2); }
+.nt-line b { color: var(--navy); font-weight: 600; }
+.nt-list { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+.nt-list li { margin: 2px 0; }
+.nt-card { margin-top: 16px; }
+.gap-ai { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line, #eef1f5); }
+.gap-ai .k { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--text-2); }

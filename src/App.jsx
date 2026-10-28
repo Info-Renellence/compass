@@ -8,9 +8,11 @@ import { Skeleton, ToastHost } from './ui.jsx';
 import Weekly from './weekly/Weekly.jsx';
 import Monthly from './monthly/Monthly.jsx';
 import SecondLook from './weekly/SecondLook.jsx';
+import Suggestions from './suggestions/Suggestions.jsx';
 
-// Weekly, Monthly, and (2026-10-27) Second look: the manager's own list of picks that differed from the suggestion.
-const viewFromHash = () => (/monthly/.test(window.location.hash) ? 'monthly' : /second-look/.test(window.location.hash) ? 'second-look' : 'weekly');
+// Weekly, Monthly, (2026-10-27) Second look: the manager's own list of picks that differed from the suggestion, and
+// (owner 2026-10-28) Suggestions: what Claude's timed jobs proposed, to accept or reject.
+const viewFromHash = () => (/monthly/.test(window.location.hash) ? 'monthly' : /second-look/.test(window.location.hash) ? 'second-look' : /suggestions/.test(window.location.hash) ? 'suggestions' : 'weekly');
 
 export default function App() {
   const [view, setView] = useState(viewFromHash);
@@ -63,6 +65,7 @@ export default function App() {
             <button type="button" className={'cx-tab' + (view === 'weekly' ? ' on' : '')} aria-current={view === 'weekly' ? 'page' : undefined} onClick={() => go('weekly')}>Weekly</button>
             <button type="button" className={'cx-tab' + (view === 'monthly' ? ' on' : '')} aria-current={view === 'monthly' ? 'page' : undefined} onClick={() => go('monthly')}>Monthly</button>
             <button type="button" className={'cx-tab' + (view === 'second-look' ? ' on' : '')} aria-current={view === 'second-look' ? 'page' : undefined} onClick={() => go('second-look')}>Second look</button>
+            <button type="button" className={'cx-tab' + (view === 'suggestions' ? ' on' : '')} aria-current={view === 'suggestions' ? 'page' : undefined} onClick={() => go('suggestions')}>Suggestions</button>
           </nav>
           {rep ? (
             <div className="cx-who">
@@ -86,7 +89,7 @@ export default function App() {
         </header>
         <main className="cx-main">
           {!repId ? <Skeleton />
-            : view === 'monthly' ? <Monthly key={'m' + repId} repId={repId} /> : view === 'second-look' ? <SecondLook key={'s' + repId} repId={repId} /> : <Weekly key={'w' + repId} repId={repId} />}
+            : view === 'monthly' ? <Monthly key={'m' + repId} repId={repId} /> : view === 'second-look' ? <SecondLook key={'s' + repId} repId={repId} /> : view === 'suggestions' ? <Suggestions /> : <Weekly key={'w' + repId} repId={repId} />}
         </main>
       </div>
     </ToastHost>

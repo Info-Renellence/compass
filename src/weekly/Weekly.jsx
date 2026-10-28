@@ -70,6 +70,18 @@ function Session({ d, repId }) {
   const set = (patch) => setS((x) => Object.assign({}, x, typeof patch === 'function' ? patch(x) : patch));
   const rep = d.rep.first, boss = d.manager.first;
   const [finding, setFinding] = useState(false);
+  // The 1-on-1 notes draft for this week and how often last week's notes showed last week's focus (owner 2026-10-28).
+  // Both are extras: if the read fails or there is nothing, nothing is shown.
+  const [nt, setNt] = useState(null);
+  useEffect(() => { data.weeklyNotes(repId).then(setNt, () => {}); }, [repId]);
+  const useDraft = (contactId) => {
+    data.useNotes(nt.notes.id, 'purpose', contactId).then((r) => {
+      if (!r.applied) { flash('No Friday check-in row for this account yet', 'warn'); return; }
+      setNt((x) => Object.assign({}, x, { notes: Object.assign({}, x.notes, { purposes: x.notes.purposes.map((p) => (p.contactId === contactId ? Object.assign({}, p, { used: true }) : p)) }) }));
+      flash('Purpose saved on the account');
+    }, (e) => flash(words(e), 'error'));
+  };
+  const draftOf = (a) => (nt && nt.notes ? nt.notes.purposes.find((p) => p.contactId === a.id) || null : null);
   useEffect(() => { flash(''); }, [s.step]);   // a toast never outlives its step
   // Each step and the done screen open at the top (Next sits at the bottom of a long step; run 3, 2026-10-23).
   useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { /* no window */ } }, [s.step, s.done]);
@@ -161,19 +173,19 @@ function Session({ d, repId }) {
       {finding ? <FindCustomer accounts={d.accounts} pickOf={finalPick} onPick={setPick} onClose={() => setFinding(false)} /> : null}
       {s.step === 1 ? <Wins d={d} rep={rep} /> : null}
       {s.step === 2 ? <Numbers d={d} rep={rep} /> : null}
-      {s.step === 3 ? <Visits visits={visits} onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }), override: unpick(x, a.id) })); flash('Removed ' + a.name); }}
+      {s.step === 3 ? <Visits visits={visits} draftOf={draftOf} onUse={useDraft} onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }), override: unpick(x, a.id) })); flash('Removed ' + a.name); }}
         onCall={(a) => {
           set((x) => ({ toCall: Object.assign({}, x.toCall, { [a.id]: true }), toVisit: Object.assign({}, x.toVisit, { [a.id]: false }), override: unpick(x, a.id) }));
           flash(a.name + ' moved to calls');
         }} /> : null}
       {s.step === 4 ? <Roleplay s={s} set={set} rep={rep} boss={boss} d={d} flash={flash} /> : null}
       {s.intro ? <RoleplayIntro skill={(skillByKey(s.skill) || {}).name} onDone={() => set({ intro: false })} /> : null}
-      {s.step === 5 ? <Calls calls={calls}
+      {s.step === 5 ? <Calls calls={calls} draftOf={draftOf} onUse={useDraft}
         onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }), override: unpick(x, a.id) })); flash('Removed ' + a.name); }}
         onVisit={(a) => {
           set((x) => ({ toVisit: Object.assign({}, x.toVisit, { [a.id]: true }), toCall: Object.assign({}, x.toCall, { [a.id]: false }), override: unpick(x, a.id) })); flash(a.name + ' moved to visits');
         }} /> : null}
-      {s.step === 6 ? <Focus s={s} set={set} rep={rep} /> : null}
+      {s.step === 6 ? <Focus s={s} set={set} rep={rep} nt={nt} /> : null}
       <Foot onBack={s.step > 1 ? back : null} onNext={next} nextLabel={s.step === 6 ? 'Save the week' : 'Next'} blocked={!okStep[s.step - 1]}
         hint={s.step === 6 ? 'Type a focus to save' : null} />
     </>
@@ -301,7 +313,16 @@ function LiveCount({ visits, calls }) {
   );
 }
 
-function Visits({ visits, onRemove, onCall }) {
+// A purpose from the 1-on-1 notes draft, under an account, with a Use button (owner 2026-10-28). Hidden without a draft.
+function DraftPurpose({ draft, onUse }) {
+  if (!draft) return null;
+  return (
+    <span className="nt-line"><span>From the notes: <b>{draft.purpose}</b></span>
+      {draft.used ? <span className="sg-state">Used</span> : <button type="button" className="minibtn" onClick={onUse}>Use</button>}</span>
+  );
+}
+
+function Visits({ visits, draftOf, onUse, onRemove, onCall }) {
   const [gone, leave] = useLeaving();
   return (
     <section className="cc">
@@ -321,7 +342,8 @@ function Visits({ visits, onRemove, onCall }) {
             <span className="ava">{a.ini}</span>
             <span className="tx"><b>{a.name}</b><span>{a.fact}</span>
               <span className="vfoot"><span className={'gpill ' + a.group}>{GROUP_LABEL[a.group]}</span>
-                <button type="button" className="minibtn tocall" onClick={() => leave(a, onCall)}><Icon name="call" size={14} />Make it a call</button></span></span>
+                <button type="button" className="minibtn tocall" onClick={() => leave(a, onCall)}><Icon name="call" size={14} />Make it a call</button></span>
+              <DraftPurpose draft={draftOf(a)} onUse={() => onUse(a.id)} /></span>
             <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => leave(a, onRemove)}><Icon name="x" size={14} /></button>
           </div>
         ))}
@@ -405,7 +427,7 @@ function Roleplay({ s, set, rep, boss, d, flash }) {
   );
 }
 
-function Calls({ calls, onRemove, onVisit }) {
+function Calls({ calls, draftOf, onUse, onRemove, onVisit }) {
   const [gone, leave] = useLeaving();
   return (
     <section className="cc">
@@ -415,7 +437,7 @@ function Calls({ calls, onRemove, onVisit }) {
         {calls.map((a) => (
           <div key={a.id} className={'callc' + (gone[a.id] ? ' leaving' : '')}>
             <span className="ava">{a.ini}</span>
-            <span className="tx"><b>{a.name}</b><span>{a.purpose || a.suggestedReason}</span></span>
+            <span className="tx"><b>{a.name}</b><span>{a.purpose || a.suggestedReason}</span><DraftPurpose draft={draftOf(a)} onUse={() => onUse(a.id)} /></span>
             <button type="button" className="minibtn tovisit" onClick={() => leave(a, onVisit)}><Icon name="pin" size={14} />Make it a visit</button>
             <button type="button" className="xbtn" aria-label={'Remove ' + a.name} onClick={() => leave(a, onRemove)}><Icon name="x" size={14} /></button>
           </div>
@@ -428,14 +450,26 @@ function Calls({ calls, onRemove, onVisit }) {
 
 // Step 6: this week's focus, typed at the end of the meeting and saved as written (Yousef 2026-10-27: no goal list, no AI
 // write-up). It is what Edge Home and Pulse show for the week.
-function Focus({ s, set, rep }) {
+function Focus({ s, set, rep, nt }) {
+  const notes = nt && nt.notes, seen = nt && nt.focusSeen;
   return (
+    <>
     <section className="cc focus-type">
       <CardHead lite icon="note" title={'What will ' + rep + ' focus on this week?'} />
       <textarea className="focus-final" value={s.focusText} maxLength={200} aria-label="This week’s focus"
         placeholder={'e.g. Get Dr. Noor and Ken to a first order, and book two visits with clinics going quiet.'}
         onChange={(e) => set({ focusText: e.target.value })} />
       <span className="foot-note">Shown on Edge and in Pulse exactly as typed · {200 - s.focusText.length} characters left</span>
+      {/* Owner 2026-10-28: only shows how often the notes showed last week's focus; the focus itself stays typed, no AI. */}
+      {seen ? <span className="foot-note">Notes showed last week’s focus {seen.matched} of {seen.total} times</span> : null}
     </section>
+    {notes && (notes.commitments.length || notes.openRequests.length) ? (
+      <section className="cc nt-card">
+        <CardHead lite icon="note" title="From the 1-on-1 notes" right={notes.shareUrl ? <a className="right-note" href={notes.shareUrl} target="_blank" rel="noopener noreferrer">Open in Fathom</a> : null} />
+        {notes.commitments.length ? <><span className="cc-note">Cat’s commitments</span><ul className="nt-list">{notes.commitments.map((c, i) => <li key={i}>{c.text}{c.due ? ' · due ' + c.due : ''}</li>)}</ul></> : null}
+        {notes.openRequests.length ? <><span className="cc-note">Open requests</span><ul className="nt-list">{notes.openRequests.map((t, i) => <li key={i}>{t}</li>)}</ul></> : null}
+      </section>
+    ) : null}
+    </>
   );
 }
