@@ -96,7 +96,8 @@ function Session({ d, repId }) {
   const calls = live.filter((a) => finalPick(a) === 'call');
   const okStep = [true, true, true, true, true, !!focusText];
 
-  const goStep = (k) => set((x) => ({ step: k, reached: Math.max(x.reached, k) }));
+  // Moving onto Roleplay plays Nell's doctor clip once per meeting (owner 2026-10-28), unless motion is reduced.
+  const goStep = (k) => set((x) => Object.assign({ step: k, reached: Math.max(x.reached, k) }, k === 4 && !x.introSeen && !reduced() ? { intro: true, introSeen: true } : {}));
   const next = () => {
     if (!okStep[s.step - 1]) { flash('Type this week’s focus first', 'warn'); return; }
     if (s.step < 6) { goStep(s.step + 1); return; }
@@ -166,6 +167,7 @@ function Session({ d, repId }) {
           flash(a.name + ' moved to calls');
         }} /> : null}
       {s.step === 4 ? <Roleplay s={s} set={set} rep={rep} boss={boss} d={d} flash={flash} /> : null}
+      {s.intro ? <RoleplayIntro skill={(skillByKey(s.skill) || {}).name} onDone={() => set({ intro: false })} /> : null}
       {s.step === 5 ? <Calls calls={calls}
         onRemove={(a) => { set((x) => ({ removed: Object.assign({}, x.removed, { [a.id]: true }), override: unpick(x, a.id) })); flash('Removed ' + a.name); }}
         onVisit={(a) => {
@@ -326,6 +328,24 @@ function Visits({ visits, onRemove, onCall }) {
       </div>
       {!visits.length ? <Empty icon="pin" text="No visits this week" /> : null}
     </section>
+  );
+}
+
+// The lead-in to the roleplay: Nell in a doctor's coat, full screen, about 5 s. Any click, a key or the clip ending
+// closes it; if the clip can't load or play, it closes at once.
+function RoleplayIntro({ skill, onDone }) {
+  useEffect(() => {
+    const key = (e) => { e.preventDefault(); onDone(); };
+    window.addEventListener('keydown', key);
+    const t = setTimeout(onDone, 7000);
+    return () => { window.removeEventListener('keydown', key); clearTimeout(t); };
+  }, []);
+  return (
+    <div className="rp-intro" role="dialog" aria-label="Roleplay time" onClick={onDone}>
+      <video className="rp-intro-clip" src="/nell/roleplay.mp4" autoPlay muted playsInline onEnded={onDone} onError={onDone}
+        ref={(v) => { if (v) { const p = v.play(); if (p && p.catch) p.catch(onDone); } }} />
+      <div className="rp-intro-text"><span className="k">ROLEPLAY TIME</span>{skill ? <b>{skill}</b> : null}<span className="skip">Click anywhere to start</span></div>
+    </div>
   );
 }
 

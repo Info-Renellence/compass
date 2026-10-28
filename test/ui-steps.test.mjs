@@ -116,3 +116,39 @@ test('the rep menu stays inside the window and scrolls', async () => {
     await server.close();
   }
 });
+
+// 2026-10-28: moving onto Roleplay plays Nell's doctor clip once per meeting; a click closes it; reduced motion skips it.
+test('the roleplay lead-in shows once, closes on a click, and never shows with reduced motion', async () => {
+  delete process.env.VITE_DATA_SOURCE;
+  const server = await createServer({ root: ROOT, logLevel: 'silent', server: { port: PORT + 3, strictPort: true, host: '127.0.0.1' } });
+  await server.listen();
+  const browser = await chromium.launch();
+  try {
+    const open = async (motion) => {
+      const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, reducedMotion: motion });
+      // Hold the clip's download open, so the lead-in stays up as it would while playing (no error, no end).
+      await page.route('**/nell/roleplay.mp4', () => {});
+      await page.goto('http://127.0.0.1:' + (PORT + 3) + '/#/weekly');
+      const next = page.getByRole('button', { name: 'Next', exact: true });
+      await next.waitFor({ timeout: 30000 });
+      for (let i = 0; i < 3; i++) await next.click();
+      return page;
+    };
+    const page = await open('no-preference');
+    const intro = page.getByRole('dialog', { name: 'Roleplay time' });
+    await intro.waitFor({ timeout: 5000 });
+    await intro.click();
+    await intro.waitFor({ state: 'detached', timeout: 5000 });
+    await page.getByText('PRACTISING', { exact: false }).first().waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await page.waitForTimeout(300);
+    assert.equal(await intro.count(), 0, 'only once per meeting');
+    const calm = await open('reduce');
+    await calm.getByText('PRACTISING', { exact: false }).first().waitFor({ timeout: 5000 });
+    assert.equal(await calm.getByRole('dialog', { name: 'Roleplay time' }).count(), 0, 'no lead-in with reduced motion');
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+});

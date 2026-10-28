@@ -488,3 +488,13 @@ body { color: var(--navy); }
 .sl2-out { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #F1F5F9; color: var(--text-2); }
 .sl2-out.yes { background: #DCFCE7; color: #15803D; }
 .find-item .ava, .sl2-row .ava { width: var(--ava-md); height: var(--ava-md); font-size: 13px; }
+
+/* ---------- Weekly · Roleplay lead-in (Nell, owner 2026-10-28) ---------- */
+.rp-intro { position: fixed; inset: 0; z-index: 60; background: #0A1A3F; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; animation: rp-in 200ms ease-out; }
+.rp-intro-clip { height: min(70vh, 640px); aspect-ratio: 720 / 956; object-fit: contain; }
+.rp-intro-text { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 12px; color: #FFFFFF; text-align: center; }
+.rp-intro-text .k { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; color: #8EC5F7; }
+.rp-intro-text b { font-size: 28px; font-weight: 800; }
+.rp-intro-text .skip { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 6px; }
+@keyframes rp-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .rp-intro { animation: none; } }
