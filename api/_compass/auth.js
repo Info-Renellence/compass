@@ -28,7 +28,7 @@ async function fromGoogle(idToken) {
   }
 }
 
-const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+const initials = (name) => String(name || '').split(/\s+/).map((w) => (w.match(/\p{L}/u) || [''])[0]).filter(Boolean).slice(0, 2).map((c) => c.toUpperCase()).join('');
 
 // The users row for an address: active and an admin, or refused.
 async function adminFor(email) {

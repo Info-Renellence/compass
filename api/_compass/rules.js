@@ -71,7 +71,8 @@ function kMoney(n) {
   return '$' + v.toLocaleString('en-CA');
 }
 const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-CA');
-const initials = (name) => String(name || '').replace(/^Dr\.?\s+/i, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+// The first LETTER of each of the first two words, as Edge's view.js and Pulse (run 4: "Jo (Ann's Nurse)" showed "J(").
+const initials = (name) => String(name || '').replace(/^Dr\.?\s+/i, '').split(/\s+/).map((w) => (w.match(/\p{L}/u) || [''])[0]).filter(Boolean).slice(0, 2).map((c) => c.toUpperCase()).join('');
 // "Dr. Noor" / "Kai": how the screens name someone in a sentence.
 const firstName = (p) => (/^Dr\.\s/.test(p.name) ? 'Dr. ' + (p.first || p.name.split(/\s+/)[1] || '') : p.first || p.name.split(/\s+/)[0]);
 const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
