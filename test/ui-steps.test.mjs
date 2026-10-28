@@ -95,3 +95,24 @@ test('the top bar fits at 1024 px on every view (no sideways scroll)', async () 
     await server.close();
   }
 });
+
+// Run 4 (2026-10-27): the "1-on-1 with" list scrolls when there are more reps than fit on the screen (before, the ones at the
+// bottom could not be reached).
+test('the rep menu stays inside the window and scrolls', async () => {
+  delete process.env.VITE_DATA_SOURCE;
+  const server = await createServer({ root: ROOT, logLevel: 'silent', server: { port: PORT + 2, strictPort: true, host: '127.0.0.1' } });
+  await server.listen();
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 260 } });
+    await page.goto('http://127.0.0.1:' + (PORT + 2) + '/#/weekly');
+    await page.locator('.cx-who > button').click();
+    await page.locator('.cx-menu.open').waitFor({ timeout: 30000 });
+    const m = await page.evaluate(() => { const e = document.querySelector('.cx-menu.open'); const r = e.getBoundingClientRect(); return { bottom: r.bottom, h: window.innerHeight, scrolls: e.scrollHeight > e.clientHeight }; });
+    assert.ok(m.bottom <= m.h, 'the menu ends at ' + m.bottom + ' px in a ' + m.h + ' px window');
+    assert.ok(m.scrolls, 'and it scrolls');
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+});

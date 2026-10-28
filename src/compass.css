@@ -86,7 +86,7 @@ body { color: var(--navy); }
 .cx-who-skel .b { width: 60px; height: 12px; }
 /* Run 4 (2026-10-27): on an iPad held sideways (1024 px) the monthly title pill pushed the rep chip past the edge (sideways scroll); tighter bar below 1100 px. */
 @media (max-width: 1100px) { .cx-bar { gap: 10px; padding: 0 16px; } .cx-bar nav { gap: 4px !important; } .cx-tab { padding: 0 10px; } .cx-who { margin-left: 0; } }
-.cx-menu { position: absolute; right: 0; top: 46px; width: 232px; background: #fff; border-radius: var(--r-lg); box-shadow: var(--e-pop); padding: 6px; z-index: 40; }
+.cx-menu { max-height: calc(100vh - 100px); overflow-y: auto; position: absolute; right: 0; top: 46px; width: 232px; background: #fff; border-radius: var(--r-lg); box-shadow: var(--e-pop); padding: 6px; z-index: 40; }
 .cx-menu:not(.open) { display: none; }   /* motion.css fades it instead */
 .cx-menu .lbl { font-size: 12px; font-weight: 700; letter-spacing: .4px; color: var(--text-2); padding: 8px 10px 4px; }
 .cx-menu .lbl.sample-row { padding-top: 10px; }
