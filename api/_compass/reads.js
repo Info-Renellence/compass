@@ -268,7 +268,10 @@ const OPS = {
     const sess = await session(sql, rep.id, 'monthly', wk.mon);
     const [tL, tP, tM] = await Promise.all([targetOf(sql, rep.id, L), targetOf(sql, rep.id, P), targetOf(sql, rep.id, M)]);
     const oL = orderedIn(x, rep, R.monthStart(L), R.monthEnd(L)), oP = orderedIn(x, rep, R.monthStart(P), R.monthEnd(P));
-    const [snap] = await sql`select metric_value from metric_snapshots where rep_id = ${rep.id} and metric = 'forecast' and snapshot_date = ${R.monthStart(L)}`;
+    // The month's forecast as it stood on the 1st (Pulse's timer saves it, 2026-10-28); before that existed, the forecast
+    // committed at that month's 1-on-1.
+    const [snap] = await sql`select metric_value from metric_snapshots where rep_id = ${rep.id} and metric = any(${['forecast', 'forecast_committed']}) and snapshot_date = ${R.monthStart(L)}
+      order by (metric = 'forecast') desc limit 1`;
     const snapV = snap ? Number(snap.metric_value) : 0;
     const endL = T.atLocal(R.monthEnd(L), 23, 59), endP = T.atLocal(R.monthEnd(P), 23, 59);
     const inL = x.people.filter((p) => R.inFiftyAt(p, endL, x.cfg.fifty_months)), inP = new Set(x.people.filter((p) => R.inFiftyAt(p, endP, x.cfg.fifty_months)).map((p) => p.id));
