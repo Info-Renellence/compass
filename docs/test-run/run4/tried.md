@@ -1,0 +1,6 @@
+# Run 4 lane A: scenarios tried (each once)
+Live-main stubs: write copied once; search/batch-read/GET not copied; PATCH/DELETE/batch update/archive/association PUT/property writes copied; other hosts not; URL object; Request object; Buffer body; Pulse hanging (2.5 s); Pulse down; no secret; install twice; 409 not copied; bearer token absent from the copy.
+Ad-leads feed: no key, wrong key, extra letter, Edge key, Pulse key + sinceMs, swapped keys, empty headers, both secrets unset, non-ASCII key, garbled since, negative sinceMs, POST.
+Cross-app: wire/paid/cancelled/rejected/samples/deleted/zero-price orders; order credited to another rep; typed focus then Edge goal; rep cannot set focus or smuggle a goal key; unknown inbound call then add_contact; second contact same number; wins scope; Edge copy create + duplicate; A,B,A copies.
+Time: 17 moments (DST, midnight, month/year/leap ends) across Edge, Compass, Pulse.
+Compass: rep subject (head office, admin, inactive, junk id, upper-case id); GET write ops, POST read ops, prototype op names, DELETE/PUT; 24 plan shapes; other rep's picks/second look; 5000-char text; 20,000 junk picks; two admins same week; monthly other-rep statuses and forecasts.
