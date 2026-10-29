@@ -1,4 +1,4 @@
-// Copied from my-fifty/api/_book.js (my-fifty eba5a43, 2026-10-29) for Compass by renellence-ops/ops/shared/sync.js. Never edit this copy: change My Fifty's file, then run sync.js.
+// Copied from my-fifty/api/_book.js (my-fifty c1fc496, 2026-10-29) for Compass by renellence-ops/ops/shared/sync.js. Never edit this copy: change My Fifty's file, then run sync.js.
 // A rep's book, with everything My Fifty shows worked out from v2's records (nothing derived is stored,
 // SOP section 9):
 //
@@ -130,7 +130,7 @@ async function book(sql, me, opts) {
        where i.contact_id = any(${ids}) and i.deleted_at is null and i.status is distinct from 'scheduled' and i.status is distinct from 'cancelled'
        group by i.contact_id`,
     sql`
-      select distinct on (t.contact_id) t.id, t.contact_id, t.title, t.kind, t.due_at
+      select distinct on (t.contact_id) t.id, t.contact_id, t.title, t.kind, t.due_at, t.created_at
         from tasks t
        where t.contact_id = any(${ids}) and t.assignee_id = ${me.id} and t.status = 'open' and t.deleted_at is null
        order by t.contact_id, t.due_at nulls last`,
