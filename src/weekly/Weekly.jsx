@@ -125,7 +125,7 @@ function Session({ d, repId }) {
   };
   const back = () => set((x) => ({ step: Math.max(1, x.step - 1) }));
 
-  const sessionText = '1-on-1 · ' + titleCase(d.session.dateLabel) + ' · ' + d.session.minutes + ' min';
+  const sessionText = '1-on-1 · ' + titleCase(d.session.dateLabel) + ' · ' + d.session.minutes + ' min' + (d.session.confirmedAt ? ' · ' + rep + ' confirmed it in Pulse' : '');
   if (s.done) {
     return (
       <>

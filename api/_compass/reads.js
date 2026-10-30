@@ -207,7 +207,7 @@ const OPS = {
     return {
       rep: { id: rep.id, first: rep.first, ini: rep.ini },
       manager: { first: me.first },
-      session: { kind: 'weekly', dateLabel: R.dateLabel(wk.mon), minutes: 45, weekStartDate: wk.mon, id: sess ? sess.id : null, completedAt: sess ? sess.completed_at : null,
+      session: { kind: 'weekly', dateLabel: R.dateLabel(wk.mon), minutes: 45, weekStartDate: wk.mon, id: sess ? sess.id : null, completedAt: sess ? sess.completed_at : null, confirmedAt: sess ? sess.week_confirmed_at : null,   // the rep's one tap in Pulse (final audit 2026-10-30)
         maxVisits: c.max_visits },
       checkin: { id: checkin ? checkin.id : null, submittedLabel: checkin ? sentLabel(checkin.submitted_at) || 'Draft, not sent' : 'No Friday check-in', helpNote: (checkin && checkin.help_note) || '' },
       wins: await wins(sql, x, lw.mon, lw.sun),

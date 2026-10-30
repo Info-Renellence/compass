@@ -25,7 +25,7 @@ const REASONS = {
 const SLIP_KINDS = ['moved', 'dropped', 'pushed_later', 'reduced'];
 
 const DEFAULTS = { max_visits: 15, park_days: 30, second_look_max: 4, sampled_no_order_days: 20, fifty_quiet_days: 30 };
-const SYRINGE_PRICE = 225;   // Edge's forecast default (reads.js forecast: syringePrice 225, cannula 185)
+const SYRINGE_PRICE = 155;   // Edge's forecast default (reads.js forecast: syringePrice 155 since the owner's $155 / $135 price list; cannula 185). Final audit 2026-10-30: was 225
 const CANNULA_PRICE = 185;
 const NEW_LEAD_DAYS = 14;      // "new ad lead -> Call": a Meta lead nobody has contacted, in the last two weeks
 const RECENT_ORDER_DAYS = 14;   // "ordered in the last 14 days, nothing open -> Wait" (proposal section 5)
