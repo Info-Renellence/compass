@@ -172,7 +172,7 @@ const OPS = {
     let picks;
     if (checkin) picks = (await sql`select * from account_picks where checkin_id = ${checkin.id}`).filter((a) => x.byId[a.contact_id]);
     else picks = R.derivePicks(x, await B.parkedUntil(sql, x.people.map((p) => p.id), { days: c.park_days, today: wk.mon }), wk.mon);   // the shared Park rule (book.js)
-    // A check-in the rep never sent is only a draft (final audit 2026-11-02: Lucas's showed 148 of his 158 accounts; the ones
+    // A check-in the rep never sent is only a draft (final audit 2026-11-02: one rep's showed 148 of 158 accounts; the ones
     // added after the draft was saved were missing): the accounts it lacks come in sorted as the check-in would sort them, as
     // the save adds them (writes.js).
     if (checkin && !checkin.submitted_at) picks = picks.concat(R.missingPicks(x, picks, await B.parkedUntil(sql, x.people.map((p) => p.id), { days: c.park_days, today: wk.mon }), wk.mon));
