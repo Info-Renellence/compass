@@ -76,10 +76,19 @@ const OPS = {
     const out = await asUser(me.id, async (tx) => {
       // Saves for one rep take turns, so two at once can't make two check-ins or two focus goals.
       await tx`select id from users where id = ${rep.id} for update`;
-      let [checkin] = await tx`select id from checkins where rep_id = ${rep.id} and week_start_date = ${wk.mon}`;
+      let [checkin] = await tx`select id, submitted_at from checkins where rep_id = ${rep.id} and week_start_date = ${wk.mon}`;
       let rows;
       if (checkin) {
         rows = await tx`select * from account_picks where checkin_id = ${checkin.id}`;
+        // A draft the rep never sent: the accounts it lacks are added as the check-in would sort them (as reads.js weekly shows).
+        if (!checkin.submitted_at) {
+          const add = R.missingPicks(x, rows, await B.parkedUntil(tx, x.people.map((p) => p.id), { days: c.park_days, today: wk.mon }), wk.mon)
+            .map((a) => Object.assign(a, { checkin_id: checkin.id }));
+          if (add.length) {
+            await tx`insert into account_picks ${tx(add, 'checkin_id', 'contact_id', 'sort_group', 'suggested_pick', 'suggested_reason', 'rep_pick')} on conflict (checkin_id, contact_id) do nothing`;
+            rows = rows.concat(add);
+          }
+        }
       } else {
         // No Friday check-in this week: the week is sorted as the check-in would sort it (suggested picks, frozen now).
         [checkin] = await tx`insert into checkins (rep_id, week_start_date) values (${rep.id}, ${wk.mon}) returning id`;

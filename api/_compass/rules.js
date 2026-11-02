@@ -200,6 +200,12 @@ function derivePicks(x, parkedUntil, weekMon) {
   return out;
 }
 
+// The accounts a draft check-in lacks (added after it was saved), sorted as derivePicks would sort them.
+function missingPicks(x, picks, parkedUntil, weekMon) {
+  const have = new Set(picks.map((a) => a.contact_id));
+  return derivePicks(x, parkedUntil, weekMon).filter((a) => !have.has(a.contact_id));
+}
+
 // Second look (proposal section 5): at most second_look_max picks where the rep's pick differs from the suggestion and
 // the data points elsewhere. Only the plain fact line is kept.
 function secondLook(picks, x) {
@@ -319,5 +325,5 @@ function inFiftyAt(p, at, months) {
 module.exports = {
   GOALS, SKILLS, SKILL_CHARACTER, CHARACTERS, PICKS, FIFTY_STATUSES, REASONS, SLIP_KINDS, DEFAULTS, SYRINGE_PRICE, CANNULA_PRICE,
   settings, weekOf, addMonths, monthStart, monthEnd, monthName, plannedMonth, dateLabel, inRange, short, kMoney, money, initials, firstName, plural,
-  fcValue, fcState, creditedTo, load, groupOf, fact, suggest, derivePicks, secondLook, noteSkill, focusActuals, inFiftyAt, activity, isVisit, isCall,
+  fcValue, fcState, creditedTo, load, groupOf, fact, suggest, derivePicks, missingPicks, secondLook, noteSkill, focusActuals, inFiftyAt, activity, isVisit, isCall,
 };
