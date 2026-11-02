@@ -201,7 +201,7 @@ const OPS = {
     const fiftyThen = x.people.filter((p) => R.inFiftyAt(p, Date.now() - 7 * T.DAY, x.cfg.fifty_months)).length;
     const dueLast = x.fcs.filter((f) => R.inRange(f.due_date, lw.mon, lw.sun));
     const landed = dueLast.filter((f) => x.byId[f.contact_id] && R.fcState(x.byId[f.contact_id], f, x.today) === 'ordered').length;
-    const changes = checkin ? await sql`select fc.change_kind, fc.reason, f.contact_id, f.due_date, f.deleted_at from forecast_changes fc join forecasts f on f.id = fc.forecast_id
+    const changes = checkin ? await sql`select fc.change_kind, fc.reason, fc.reason_note, f.contact_id, f.due_date, f.deleted_at from forecast_changes fc join forecasts f on f.id = fc.forecast_id
       where fc.checkin_id = ${checkin.id} order by fc.created_at` : [];
     const KIND = { moved: 'moved to ', pushed_later: 'pushed to ', pulled_forward: 'pulled forward to ', dropped: 'dropped', reduced: 'reduced', went_up: 'went up' };
     const skill = R.noteSkill(checkin && checkin.help_note);
@@ -224,7 +224,7 @@ const OPS = {
       },
       missedVisits: lastPicks.filter((a) => a.missed_at && a.final_pick === 'visit' && x.byId[a.contact_id]).map((a) => ({ name: x.byId[a.contact_id].name })),
       forecastChanges: changes.filter((r) => x.byId[r.contact_id]).map((r) => ({ who: R.firstName(x.byId[r.contact_id]),
-        what: KIND[r.change_kind] + (KIND[r.change_kind].endsWith(' ') ? R.monthName(T.ymd(r.due_date).slice(0, 7)) : ''), reason: R.REASONS[r.reason] || r.reason })),
+        what: KIND[r.change_kind] + (KIND[r.change_kind].endsWith(' ') ? R.monthName(T.ymd(r.due_date).slice(0, 7)) : ''), reason: r.reason === 'other' && r.reason_note ? 'Other: ' + r.reason_note : R.REASONS[r.reason] || r.reason })),   // Other carries the rep's words (v2-019)
       accounts,
       secondLook: look.map((l) => ({ id: l.contact_id, fact: l.fact, decision: l.decision || null })),
       roleplay: { noteSkill: skill, noteCharacter: skill ? R.SKILL_CHARACTER[skill] : null, monthSkill: await monthSkill(sql, rep.id, wk.sun) },

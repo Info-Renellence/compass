@@ -19,7 +19,7 @@ const FIFTY_STATUSES = ['on_track', 'watch', 'at_risk'];
 const REASONS = {
   clinic_timing: 'Clinic’s timing', still_has_stock: 'Still has stock', budget: 'Budget or cash flow',
   decision_maker_unreachable: 'Can’t reach the decision maker', no_next_step: 'No next step', chose_other_brand: 'Chose another brand',
-  estimate_off: 'Estimate was off', more_patient_demand: 'More patient demand', new_product_line: 'New product line',
+  estimate_off: 'Estimate was off', other: 'Other', more_patient_demand: 'More patient demand', new_product_line: 'New product line',
   clinic_pulled_forward: 'Clinic pulled it forward',
 };
 const SLIP_KINDS = ['moved', 'dropped', 'pushed_later', 'reduced'];
